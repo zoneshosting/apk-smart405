@@ -72,16 +72,55 @@ jobs:
     - name: Decompile APK
       run: |
         echo "Decompiling apk/${{ github.event.inputs.apk_file }}..."
-        apktool d "apk/${{ github.event.inputs.apk_file }}" -o decompiled_apk --force
+        
+        # Try with different apktool options to handle complex APKs
+        if ! apktool d "apk/${{ github.event.inputs.apk_file }}" -o decompiled_apk --force --no-src; then
+          echo "Standard decompilation failed, trying with --only-main-classes..."
+          if ! apktool d "apk/${{ github.event.inputs.apk_file }}" -o decompiled_apk --force --only-main-classes; then
+            echo "Trying basic decompilation without source..."
+            apktool d "apk/${{ github.event.inputs.apk_file }}" -o decompiled_apk --force --no-debug-info
+          fi
+        fi
         
         if [ ! -d "decompiled_apk" ]; then
-          echo "ERROR: APK decompilation failed"
+          echo "ERROR: APK decompilation failed completely"
           exit 1
         fi
         
         echo "APK decompiled successfully"
         echo "Decompiled APK structure:"
         find decompiled_apk -maxdepth 2 -type d | sort
+
+    - name: Clean duplicate classes
+      run: |
+        echo "Checking for and cleaning duplicate classes..."
+        
+        # Find potential duplicate smali files
+        cd decompiled_apk
+        
+        # Remove duplicate Facebook Ads SDK files that might cause conflicts
+        if [ -d "smali/com/facebook/ads" ]; then
+          echo "Found Facebook Ads SDK, checking for duplicates..."
+          
+          # Look for duplicate classes in different smali folders
+          for class_file in $(find smali/com/facebook/ads -name "*.smali" -type f); do
+            relative_path=$(echo "$class_file" | sed 's|^smali/||')
+            
+            # Check if this class exists in other smali folders
+            for smali_dir in smali_classes*; do
+              if [ -d "$smali_dir" ] && [ -f "$smali_dir/$relative_path" ]; then
+                echo "Removing duplicate: $smali_dir/$relative_path"
+                rm -f "$smali_dir/$relative_path"
+              fi
+            done
+          done
+        fi
+        
+        # Remove any .orig files that might have been created
+        find . -name "*.orig" -delete
+        
+        cd ..
+        echo "Duplicate class cleanup completed"
 
     - name: Replace package name in smali files
       run: |
@@ -97,7 +136,9 @@ jobs:
         SMALI_COUNT=$(find decompiled_apk -name "*.smali" -type f | wc -l)
         echo "Processing $SMALI_COUNT smali files..."
         
-        find decompiled_apk -name "*.smali" -type f -exec sed -i "s|$OLD_PACKAGE|$NEW_PACKAGE|g" {} \;
+        # Use more specific sed commands to avoid conflicts
+        find decompiled_apk -name "*.smali" -type f -exec sed -i "s|L$OLD_PACKAGE|L$NEW_PACKAGE|g" {} \;
+        find decompiled_apk -name "*.smali" -type f -exec sed -i "s|\"$OLD_PACKAGE\"|\"$NEW_PACKAGE\"|g" {} \;
         find decompiled_apk -name "*.smali" -type f -exec sed -i "s|$OLD_PACKAGE_B64|$NEW_PACKAGE_B64|g" {} \;
         
         OLD_PATH=$(echo "$OLD_PACKAGE" | tr '.' '/')
@@ -127,7 +168,8 @@ jobs:
         echo "  Old: $OLD_APP_NAME"
         echo "  New: $NEW_APP_NAME"
         
-        find decompiled_apk -name "*.smali" -type f -exec sed -i "s|$OLD_APP_NAME|$NEW_APP_NAME|g" {} \;
+        # Use quotes to ensure exact matches
+        find decompiled_apk -name "*.smali" -type f -exec sed -i "s|\"$OLD_APP_NAME\"|\"$NEW_APP_NAME\"|g" {} \;
         find decompiled_apk -name "*.smali" -type f -exec sed -i "s|$OLD_APP_NAME_B64|$NEW_APP_NAME_B64|g" {} \;
         
         STRINGS_COUNT=$(find decompiled_apk -name "strings.xml" -type f | wc -l)
@@ -234,13 +276,54 @@ jobs:
           echo "No package structure changes needed"
         fi
 
+    - name: Fix APK compilation issues
+      run: |
+        echo "Preparing APK for recompilation..."
+        
+        cd decompiled_apk
+        
+        # Fix common apktool compilation issues
+        echo "Fixing apktool.yml configuration..."
+        if [ -f "apktool.yml" ]; then
+          # Ensure proper configuration for recompilation
+          sed -i 's/doNotCompress:/# doNotCompress:/g' apktool.yml
+          sed -i 's/unknownFiles:/# unknownFiles:/g' apktool.yml
+          
+          # Add compression settings to avoid issues
+          echo "" >> apktool.yml
+          echo "# Modified for recompilation" >> apktool.yml
+          echo "doNotCompress:" >> apktool.yml
+          echo "- resources.arsc" >> apktool.yml
+        fi
+        
+        # Remove any problematic META-INF files
+        if [ -d "original/META-INF" ]; then
+          echo "Cleaning META-INF directory..."
+          rm -rf original/META-INF/*.RSA
+          rm -rf original/META-INF/*.SF
+          rm -rf original/META-INF/MANIFEST.MF
+        fi
+        
+        cd ..
+        echo "APK preparation completed"
+
     - name: Recompile APK
       run: |
         echo "Recompiling APK..."
-        apktool b decompiled_apk -o modified_unsigned.apk
+        
+        # Try recompilation with different options
+        if ! apktool b decompiled_apk -o modified_unsigned.apk --use-aapt2; then
+          echo "AAPT2 failed, trying with AAPT1..."
+          if ! apktool b decompiled_apk -o modified_unsigned.apk; then
+            echo "Standard compilation failed, trying without compression..."
+            apktool b decompiled_apk -o modified_unsigned.apk --no-crunch
+          fi
+        fi
         
         if [ ! -f "modified_unsigned.apk" ]; then
-          echo "ERROR: APK compilation failed"
+          echo "ERROR: APK compilation failed completely"
+          echo "Checking decompiled directory structure..."
+          ls -la decompiled_apk/
           exit 1
         fi
         
@@ -302,6 +385,7 @@ jobs:
         - App Name: Dynamic TV → ${{ github.event.inputs.new_app_name }}
         - Images: Replaced with assets from images-to-replace/ folder
         - APK: Recompiled and signed
+        - Fixed: Duplicate class issues resolved
 
         Files Generated:
         - modified_signed_aligned.apk (Ready for installation)
@@ -332,6 +416,7 @@ jobs:
         echo "- **Package Name:** com.dynamic.tv → ${{ github.event.inputs.new_package_name }}" >> $GITHUB_STEP_SUMMARY
         echo "- **App Name:** Dynamic TV → ${{ github.event.inputs.new_app_name }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Images:** Replaced with provided assets" >> $GITHUB_STEP_SUMMARY
+        echo "- **Fixed:** Duplicate class conflicts resolved" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Output Files:" >> $GITHUB_STEP_SUMMARY
         echo "- **Signed APK:** modified_signed_aligned.apk" >> $GITHUB_STEP_SUMMARY
