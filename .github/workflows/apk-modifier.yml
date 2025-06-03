@@ -19,9 +19,6 @@ on:
         default: 'SI TV'
         type: string
 
-# Prevent automatic execution on push/PR
-# This workflow should only be triggered manually
-
 jobs:
   modify-apk:
     runs-on: ubuntu-latest
@@ -41,7 +38,6 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y aapt zipalign
         
-        # Install apktool
         echo "Installing apktool..."
         wget -q https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool
         wget -q https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar
@@ -49,7 +45,6 @@ jobs:
         sudo mv apktool /usr/local/bin/
         sudo mv apktool_2.9.3.jar /usr/local/bin/apktool.jar
         
-        # Verify installation
         apktool --version
 
     - name: Generate keystore for signing
@@ -60,7 +55,7 @@ jobs:
           -storepass password -keypass password \
           -dname "CN=GitHub Action, OU=CI, O=GitHub, L=GitHub, S=GitHub, C=US"
         
-        echo "✓ Keystore generated successfully"
+        echo "Keystore generated successfully"
 
     - name: Verify APK file exists
       run: |
@@ -71,9 +66,7 @@ jobs:
           ls -la apk/ || echo "apk/ directory not found"
           exit 1
         fi
-        echo "✓ Found APK file: apk/${{ github.event.inputs.apk_file }}"
-        
-        # Show APK file size
+        echo "Found APK file: apk/${{ github.event.inputs.apk_file }}"
         ls -lh "apk/${{ github.event.inputs.apk_file }}"
 
     - name: Decompile APK
@@ -86,21 +79,12 @@ jobs:
           exit 1
         fi
         
-        echo "✓ APK decompiled successfully"
-        
-        # Show directory structure for debugging
+        echo "APK decompiled successfully"
         echo "Decompiled APK structure:"
         find decompiled_apk -maxdepth 2 -type d | sort
-        
-        echo "Smali files found:"
-        find decompiled_apk -type f -name "*.smali" | head -5
-        
-        echo "Image files found:"
-        find decompiled_apk -type f \( -name "*.png" -o -name "*.jpg" \) | head -10
 
     - name: Replace package name in smali files
       run: |
-        # Define old and new values
         OLD_PACKAGE="com.dynamic.tv"
         OLD_PACKAGE_B64="Y29tLmR5bmFtaWMudHY="
         NEW_PACKAGE="${{ github.event.inputs.new_package_name }}"
@@ -109,39 +93,31 @@ jobs:
         echo "Replacing package name:"
         echo "  Old: $OLD_PACKAGE"
         echo "  New: $NEW_PACKAGE"
-        echo "  Old B64: $OLD_PACKAGE_B64"
-        echo "  New B64: $NEW_PACKAGE_B64"
         
-        # Count files before replacement
         SMALI_COUNT=$(find decompiled_apk -name "*.smali" -type f | wc -l)
         echo "Processing $SMALI_COUNT smali files..."
         
-        # Replace in smali files
         find decompiled_apk -name "*.smali" -type f -exec sed -i "s|$OLD_PACKAGE|$NEW_PACKAGE|g" {} \;
         find decompiled_apk -name "*.smali" -type f -exec sed -i "s|$OLD_PACKAGE_B64|$NEW_PACKAGE_B64|g" {} \;
         
-        # Replace package path structure (com/dynamic/tv -> com/sitv/live)
         OLD_PATH=$(echo "$OLD_PACKAGE" | tr '.' '/')
         NEW_PATH=$(echo "$NEW_PACKAGE" | tr '.' '/')
         find decompiled_apk -name "*.smali" -type f -exec sed -i "s|$OLD_PATH|$NEW_PATH|g" {} \;
         
-        # Update AndroidManifest.xml
         if [ -f "decompiled_apk/AndroidManifest.xml" ]; then
           sed -i "s|$OLD_PACKAGE|$NEW_PACKAGE|g" decompiled_apk/AndroidManifest.xml
-          echo "✓ Updated AndroidManifest.xml"
+          echo "Updated AndroidManifest.xml"
         fi
         
-        # Update apktool.yml if it contains package references
         if [ -f "decompiled_apk/apktool.yml" ]; then
           sed -i "s|$OLD_PACKAGE|$NEW_PACKAGE|g" decompiled_apk/apktool.yml
-          echo "✓ Updated apktool.yml"
+          echo "Updated apktool.yml"
         fi
         
-        echo "✓ Package name replacement completed"
+        echo "Package name replacement completed"
 
     - name: Replace app name in smali files
       run: |
-        # Define old and new app names
         OLD_APP_NAME="Dynamic TV"
         OLD_APP_NAME_B64="RHluYW1pYyBUVg=="
         NEW_APP_NAME="${{ github.event.inputs.new_app_name }}"
@@ -150,29 +126,23 @@ jobs:
         echo "Replacing app name:"
         echo "  Old: $OLD_APP_NAME"
         echo "  New: $NEW_APP_NAME"
-        echo "  Old B64: $OLD_APP_NAME_B64"
-        echo "  New B64: $NEW_APP_NAME_B64"
         
-        # Replace in smali files
         find decompiled_apk -name "*.smali" -type f -exec sed -i "s|$OLD_APP_NAME|$NEW_APP_NAME|g" {} \;
         find decompiled_apk -name "*.smali" -type f -exec sed -i "s|$OLD_APP_NAME_B64|$NEW_APP_NAME_B64|g" {} \;
         
-        # Update strings.xml files
         STRINGS_COUNT=$(find decompiled_apk -name "strings.xml" -type f | wc -l)
         if [ $STRINGS_COUNT -gt 0 ]; then
           echo "Updating $STRINGS_COUNT strings.xml files..."
           find decompiled_apk -name "strings.xml" -type f -exec sed -i "s|$OLD_APP_NAME|$NEW_APP_NAME|g" {} \;
         fi
         
-        # Update AndroidManifest.xml app label
         if [ -f "decompiled_apk/AndroidManifest.xml" ]; then
           sed -i "s|android:label=\"$OLD_APP_NAME\"|android:label=\"$NEW_APP_NAME\"|g" decompiled_apk/AndroidManifest.xml
-          # Also handle references without quotes
           sed -i "s|$OLD_APP_NAME|$NEW_APP_NAME|g" decompiled_apk/AndroidManifest.xml
-          echo "✓ Updated AndroidManifest.xml app label"
+          echo "Updated AndroidManifest.xml app label"
         fi
         
-        echo "✓ App name replacement completed"
+        echo "App name replacement completed"
 
     - name: Replace image files
       run: |
@@ -186,7 +156,6 @@ jobs:
         echo "Available replacement images:"
         ls -la images-to-replace/
         
-        # Create a list of images that need to be replaced
         declare -a images=(
           "banner.png"
           "brick.jpg"
@@ -205,12 +174,10 @@ jobs:
           "your_logo.png"
         )
         
-        # Replace images if they exist in both source and decompiled APK
         replaced_count=0
         for image in "${images[@]}"; do
           echo "Processing $image..."
           
-          # Find all instances of this image in the decompiled APK
           targets=$(find decompiled_apk -name "$image" -type f)
           if [ -n "$targets" ] && [ -f "images-to-replace/$image" ]; then
             echo "$targets" | while read -r target_path; do
@@ -225,13 +192,12 @@ jobs:
           fi
         done
         
-        echo "✓ Image replacement completed"
+        echo "Image replacement completed"
 
     - name: Update package directory structure
       run: |
         echo "Updating package directory structure..."
         
-        # Function to move package structure
         move_package_structure() {
           local smali_dir=$1
           local old_path="$smali_dir/com/dynamic/tv"
@@ -241,24 +207,19 @@ jobs:
             echo "Moving package structure in $smali_dir..."
             mkdir -p "$(dirname "$new_path")"
             mv "$old_path" "$new_path"
-            
-            # Remove empty old directories
             rmdir -p "$smali_dir/com/dynamic" 2>/dev/null || true
-            echo "✓ Package structure updated in $smali_dir"
+            echo "Package structure updated in $smali_dir"
             return 0
           fi
           return 1
         }
         
-        # Move smali files to new package structure if needed
         moved=false
         
-        # Check main smali directory
         if move_package_structure "decompiled_apk/smali"; then
           moved=true
         fi
         
-        # Check for smali_classes2, smali_classes3, etc.
         for smali_dir in decompiled_apk/smali_classes*; do
           if [ -d "$smali_dir" ]; then
             if move_package_structure "$smali_dir"; then
@@ -268,9 +229,9 @@ jobs:
         done
         
         if [ "$moved" = true ]; then
-          echo "✓ Package directory structure updated"
+          echo "Package directory structure updated"
         else
-          echo "ℹ No package structure changes needed"
+          echo "No package structure changes needed"
         fi
 
     - name: Recompile APK
@@ -278,22 +239,18 @@ jobs:
         echo "Recompiling APK..."
         apktool b decompiled_apk -o modified_unsigned.apk
         
-        # Verify the APK was created
         if [ ! -f "modified_unsigned.apk" ]; then
           echo "ERROR: APK compilation failed"
-          echo "Checking for error logs..."
-          ls -la
           exit 1
         fi
         
-        echo "✓ APK compiled successfully"
+        echo "APK compiled successfully"
         ls -lh modified_unsigned.apk
 
     - name: Sign APK
       run: |
         echo "Signing APK..."
         
-        # Sign the APK
         jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 \
           -keystore release-key.keystore -storepass password \
           modified_unsigned.apk alias_name
@@ -303,7 +260,6 @@ jobs:
           exit 1
         fi
         
-        # Align the APK
         zipalign -v 4 modified_unsigned.apk modified_signed_aligned.apk
         
         if [ $? -ne 0 ]; then
@@ -311,7 +267,7 @@ jobs:
           exit 1
         fi
         
-        echo "✓ APK signed and aligned successfully"
+        echo "APK signed and aligned successfully"
         ls -lh modified_signed_aligned.apk
 
     - name: Verify APK
@@ -320,12 +276,11 @@ jobs:
         jarsigner -verify -verbose -certs modified_signed_aligned.apk
         
         if [ $? -eq 0 ]; then
-          echo "✓ APK signature verification successful"
+          echo "APK signature verification successful"
         else
-          echo "⚠ APK signature verification failed, but APK may still be usable"
+          echo "APK signature verification failed, but APK may still be usable"
         fi
         
-        # Show APK info
         echo "APK Information:"
         aapt dump badging modified_signed_aligned.apk | head -10 || echo "Could not get APK info"
 
@@ -336,30 +291,29 @@ jobs:
         cp modified_signed_aligned.apk output/
         cp modified_unsigned.apk output/
         
-        # Create a summary file
         cat > output/modification_summary.txt << EOF
-APK Modification Summary
-========================
-Original APK: ${{ github.event.inputs.apk_file }}
-Modified APK: modified_signed_aligned.apk
+        APK Modification Summary
+        ========================
+        Original APK: ${{ github.event.inputs.apk_file }}
+        Modified APK: modified_signed_aligned.apk
 
-Changes Made:
-- Package Name: com.dynamic.tv → ${{ github.event.inputs.new_package_name }}
-- App Name: Dynamic TV → ${{ github.event.inputs.new_app_name }}
-- Images: Replaced with assets from images-to-replace/ folder
-- APK: Recompiled and signed
+        Changes Made:
+        - Package Name: com.dynamic.tv → ${{ github.event.inputs.new_package_name }}
+        - App Name: Dynamic TV → ${{ github.event.inputs.new_app_name }}
+        - Images: Replaced with assets from images-to-replace/ folder
+        - APK: Recompiled and signed
 
-Files Generated:
-- modified_signed_aligned.apk (Ready for installation)
-- modified_unsigned.apk (Unsigned version)
+        Files Generated:
+        - modified_signed_aligned.apk (Ready for installation)
+        - modified_unsigned.apk (Unsigned version)
 
-Generated on: $(date)
-Generated by: GitHub Actions
-Repository: ${{ github.repository }}
-Commit: ${{ github.sha }}
-EOF
+        Generated on: $(date)
+        Generated by: GitHub Actions
+        Repository: ${{ github.repository }}
+        Commit: ${{ github.sha }}
+        EOF
         
-        echo "✓ Files organized in output/ directory:"
+        echo "Files organized in output/ directory:"
         ls -la output/
 
     - name: Upload modified APK
