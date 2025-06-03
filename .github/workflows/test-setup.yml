@@ -1,0 +1,108 @@
+name: Test Repository Setup
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths: [ '.github/workflows/test-setup.yml' ]
+
+jobs:
+  test-setup:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Check repository structure
+      run: |
+        echo "## Repository Structure Test 📁" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        echo "Checking repository structure..."
+        
+        # Check for required directories and files
+        checks_passed=0
+        total_checks=0
+        
+        # Check APK directory
+        total_checks=$((total_checks + 1))
+        if [ -d "apk" ]; then
+          echo "✅ apk/ directory exists"
+          echo "- ✅ **apk/ directory found**" >> $GITHUB_STEP_SUMMARY
+          checks_passed=$((checks_passed + 1))
+          
+          if [ -f "apk/Dynamic-TV.apk" ]; then
+            echo "✅ Dynamic-TV.apk found"
+            echo "- ✅ **Dynamic-TV.apk found**" >> $GITHUB_STEP_SUMMARY
+            ls -lh apk/Dynamic-TV.apk
+          else
+            echo "❌ Dynamic-TV.apk not found in apk/ directory"
+            echo "- ❌ **Dynamic-TV.apk missing**" >> $GITHUB_STEP_SUMMARY
+          fi
+        else
+          echo "❌ apk/ directory not found"
+          echo "- ❌ **apk/ directory missing**" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # Check images directory
+        total_checks=$((total_checks + 1))
+        if [ -d "images-to-replace" ]; then
+          echo "✅ images-to-replace/ directory exists"
+          echo "- ✅ **images-to-replace/ directory found**" >> $GITHUB_STEP_SUMMARY
+          checks_passed=$((checks_passed + 1))
+          
+          image_count=$(find images-to-replace -name "*.png" -o -name "*.jpg" | wc -l)
+          echo "Found $image_count image files"
+          echo "- 📸 **$image_count image files found**" >> $GITHUB_STEP_SUMMARY
+          
+          echo "Image files:"
+          ls -la images-to-replace/
+        else
+          echo "❌ images-to-replace/ directory not found"
+          echo "- ❌ **images-to-replace/ directory missing**" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # Check workflow files
+        total_checks=$((total_checks + 1))
+        if [ -f ".github/workflows/apk-modifier.yml" ]; then
+          echo "✅ APK modifier workflow exists"
+          echo "- ✅ **APK modifier workflow found**" >> $GITHUB_STEP_SUMMARY
+          checks_passed=$((checks_passed + 1))
+        else
+          echo "❌ APK modifier workflow not found"
+          echo "- ❌ **APK modifier workflow missing**" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # Check documentation
+        total_checks=$((total_checks + 1))
+        if [ -f "README.md" ]; then
+          echo "✅ README.md exists"
+          echo "- ✅ **README.md found**" >> $GITHUB_STEP_SUMMARY
+          checks_passed=$((checks_passed + 1))
+        else
+          echo "❌ README.md not found"
+          echo "- ❌ **README.md missing**" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Test Results: $checks_passed/$total_checks passed" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ $checks_passed -eq $total_checks ]; then
+          echo "🎉 **All tests passed! Repository is ready for APK modification.**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Go to **Actions** tab" >> $GITHUB_STEP_SUMMARY
+          echo "2. Select **APK Modifier** workflow" >> $GITHUB_STEP_SUMMARY
+          echo "3. Click **Run workflow**" >> $GITHUB_STEP_SUMMARY
+          echo "4. Fill in your desired package name and app name" >> $GITHUB_STEP_SUMMARY
+          echo "5. Download the modified APK from artifacts" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ **Some checks failed. Please fix the issues before running APK modification.**" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Show directory tree
+      run: |
+        echo "Complete directory structure:"
+        find . -type f -not -path './.git/*' | sort
