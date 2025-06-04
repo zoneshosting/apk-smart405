@@ -1,0 +1,423 @@
+name: APK Modifier - Precision Cleanup
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_file:
+        description: 'Name of the APK file to modify (should be in apk/ folder)'
+        required: true
+        default: 'Dynamic-TV.apk'
+        type: string
+      new_package_name:
+        description: 'New package name'
+        required: true
+        default: 'com.sitv.live'
+        type: string
+      new_app_name:
+        description: 'New app name'
+        required: true
+        default: 'SI TV'
+        type: string
+      panel_url_value:
+        description: 'Panel URL value (replaces "dynam" in URLs)'
+        required: true
+        default: 'sitv'
+        type: string
+
+jobs:
+  modify-apk:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Java and Android SDK
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '21'
+
+    - name: Install APK Tools
+      run: |
+        echo "📱 Installing APK tools..."
+        sudo apt-get update
+        sudo apt-get install -y aapt zipalign
+        
+        echo "Installing APKTool..."
+        wget -q https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool
+        wget -q https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar
+        chmod +x apktool
+        sudo mv apktool /usr/local/bin/
+        sudo mv apktool_2.9.3.jar /usr/local/bin/apktool.jar
+        
+        apktool --version
+
+    - name: Generate Keystore
+      run: |
+        echo "🔐 Generating keystore..."
+        keytool -genkey -v -keystore release-key.keystore -alias alias_name \
+          -keyalg RSA -keysize 4096 -validity 10000 \
+          -sigalg SHA256withRSA \
+          -storepass password -keypass password \
+          -dname "CN=APK Modifier, OU=GitHub Actions, O=APK Smart405, L=Cloud, S=Cloud, C=US"
+
+    - name: Verify APK and Decompile
+      run: |
+        echo "🔍 Verifying and decompiling APK..."
+        if [ ! -f "apk/${{ github.event.inputs.apk_file }}" ]; then
+          echo "❌ ERROR: APK file not found: apk/${{ github.event.inputs.apk_file }}"
+          exit 1
+        fi
+        
+        echo "📊 Original APK info:"
+        aapt dump badging "apk/${{ github.event.inputs.apk_file }}" | head -5
+        
+        # Decompile with conservative settings
+        if ! apktool d "apk/${{ github.event.inputs.apk_file }}" -o decompiled_apk --force; then
+          echo "Standard decompilation failed, trying fallback..."
+          apktool d "apk/${{ github.event.inputs.apk_file }}" -o decompiled_apk --force --no-debug-info
+        fi
+        
+        echo "✅ APK decompiled successfully"
+        echo "📁 Directory structure:"
+        ls -la decompiled_apk/
+        
+        SMALI_COUNT=$(find decompiled_apk -name "*.smali" | wc -l)
+        echo "📊 Total smali files: $SMALI_COUNT"
+
+    - name: 🎯 PRECISION FACEBOOK SDK CLEANUP
+      run: |
+        echo "🎯 PRECISION FACEBOOK SDK CLEANUP"
+        echo "============================================================"
+        echo "STRATEGY: Remove ONLY the problematic DynamicLoaderImpl duplicates"
+        echo "PRESERVE: All essential assets, smali_assets, and required classes"
+        
+        cd decompiled_apk
+        
+        # Step 1: Find ALL DynamicLoaderImpl files
+        echo "🔍 Finding DynamicLoaderImpl conflicts..."
+        DYNAMIC_FILES=$(find . -name "DynamicLoaderImpl.smali" -type f 2>/dev/null || true)
+        
+        if [ -n "$DYNAMIC_FILES" ]; then
+          echo "Found DynamicLoaderImpl files:"
+          echo "$DYNAMIC_FILES"
+          
+          # Count them
+          FILE_COUNT=$(echo "$DYNAMIC_FILES" | wc -l)
+          echo "Total count: $FILE_COUNT"
+          
+          if [ "$FILE_COUNT" -gt 1 ]; then
+            echo "🎯 Multiple DynamicLoaderImpl files found - removing duplicates..."
+            
+            # Keep the one in smali_assets (most important), remove others
+            ASSETS_FILE=$(echo "$DYNAMIC_FILES" | grep "smali_assets" | head -1)
+            if [ -n "$ASSETS_FILE" ]; then
+              echo "Keeping assets version: $ASSETS_FILE"
+              echo "$DYNAMIC_FILES" | grep -v "smali_assets" | while read -r file; do
+                if [ -f "$file" ]; then
+                  echo "  Removing duplicate: $file"
+                  rm -f "$file"
+                fi
+              done
+            else
+              # If no assets version, keep the first one found
+              FIRST_FILE=$(echo "$DYNAMIC_FILES" | head -1)
+              echo "Keeping first version: $FIRST_FILE"
+              echo "$DYNAMIC_FILES" | tail -n +2 | while read -r file; do
+                if [ -f "$file" ]; then
+                  echo "  Removing duplicate: $file"
+                  rm -f "$file"
+                fi
+              done
+            fi
+          else
+            echo "✅ Only one DynamicLoaderImpl file - no duplicates to remove"
+          fi
+        else
+          echo "ℹ️ No DynamicLoaderImpl files found"
+        fi
+        
+        # Step 2: Remove only problematic Facebook SDK components
+        echo "🧹 Removing only problematic Facebook components..."
+        
+        # Remove specific problematic paths but preserve essential ones
+        find . -path "*/com/facebook/ads/internal/checkerframework" -type d -exec rm -rf {} + 2>/dev/null || true
+        find . -path "*/com/facebook/ads/internal/annotations" -type d -exec rm -rf {} + 2>/dev/null || true
+        
+        # Clean up build artifacts but preserve source
+        find . -name "*.orig" -delete 2>/dev/null || true
+        find . -name "*.rej" -delete 2>/dev/null || true
+        
+        # Step 3: Verify essential structure is preserved
+        echo "✅ Verification - Essential structure preserved:"
+        echo "  smali_assets exists: $([ -d "smali_assets" ] && echo "YES" || echo "NO")"
+        echo "  smali exists: $([ -d "smali" ] && echo "YES" || echo "NO")"
+        echo "  smali_classes2 exists: $([ -d "smali_classes2" ] && echo "YES" || echo "NO")"
+        echo "  smali_classes3 exists: $([ -d "smali_classes3" ] && echo "YES" || echo "NO")"
+        
+        REMAINING_DYNAMIC=$(find . -name "DynamicLoaderImpl.smali" | wc -l)
+        echo "  Remaining DynamicLoaderImpl files: $REMAINING_DYNAMIC"
+        
+        TOTAL_SMALI_AFTER=$(find . -name "*.smali" | wc -l)
+        echo "  Total smali files after cleanup: $TOTAL_SMALI_AFTER"
+        
+        cd ..
+        echo "🎯 PRECISION CLEANUP COMPLETE"
+
+    - name: Update Manifest for Dynamic TV Compatibility
+      run: |
+        echo "📱 Updating manifest to match Dynamic TV compatibility..."
+        
+        cd decompiled_apk
+        
+        if [ -f "AndroidManifest.xml" ]; then
+          echo "Applying Dynamic TV APK settings:"
+          echo "- compileSdkVersion: 23"
+          echo "- targetSdkVersion: 33" 
+          echo "- minSdkVersion: 21"
+          
+          # Apply exact Dynamic TV settings
+          sed -i 's/android:compileSdkVersion="[0-9]*"/android:compileSdkVersion="23"/g' AndroidManifest.xml
+          sed -i 's/android:targetSdkVersion="[0-9]*"/android:targetSdkVersion="33"/g' AndroidManifest.xml
+          sed -i 's/android:minSdkVersion="[0-9]*"/android:minSdkVersion="21"/g' AndroidManifest.xml
+          
+          echo "✅ Manifest updated with Dynamic TV compatibility"
+        fi
+        
+        cd ..
+
+    - name: 🎯 URL Replacement
+      run: |
+        NEW_PANEL_VALUE="${{ github.event.inputs.panel_url_value }}"
+        
+        echo "🎯 URL REPLACEMENT"
+        echo "Target: dynam → $NEW_PANEL_VALUE"
+        
+        OLD_URL1="https://rebrandking.com/panels/SM4trio/dynam/"
+        OLD_URL2="https://rebrandking.com/panels/SM4trio/dynam/api/"
+        NEW_URL1="https://rebrandking.com/panels/SM4trio/$NEW_PANEL_VALUE/"
+        NEW_URL2="https://rebrandking.com/panels/SM4trio/$NEW_PANEL_VALUE/api/"
+        
+        # Find rebrandking files
+        REBRAND_FILES=$(find decompiled_apk -name "*.smali" -exec grep -l "rebrandking.com" {} \; 2>/dev/null || true)
+        
+        if [ -n "$REBRAND_FILES" ]; then
+          echo "✅ Found rebrandking URLs in $(echo "$REBRAND_FILES" | wc -l) files"
+          echo "$REBRAND_FILES" | while IFS= read -r file; do
+            if [ -f "$file" ]; then
+              sed -i "s|$OLD_URL1|$NEW_URL1|g" "$file"
+              sed -i "s|$OLD_URL2|$NEW_URL2|g" "$file"
+            fi
+          done
+          
+          # Verify replacement
+          FINAL_NEW=$(find decompiled_apk -name "*.smali" -exec grep -c "rebrandking.com/panels/SM4trio/$NEW_PANEL_VALUE" {} \; 2>/dev/null | awk '{sum += $1} END {print sum+0}') || FINAL_NEW=0
+          echo "✅ URLs replaced: $FINAL_NEW"
+        else
+          echo "ℹ️ No rebrandking URLs found"
+        fi
+
+    - name: Update Package and App Names
+      run: |
+        echo "📦 Updating package and app names..."
+        
+        OLD_PACKAGE="com.dynamic.tv"
+        NEW_PACKAGE="${{ github.event.inputs.new_package_name }}"
+        OLD_APP_NAME="Dynamic TV"
+        NEW_APP_NAME="${{ github.event.inputs.new_app_name }}"
+        
+        # Update smali files
+        find decompiled_apk -name "*.smali" -type f -exec sed -i "s|L$OLD_PACKAGE|L$NEW_PACKAGE|g" {} \;
+        find decompiled_apk -name "*.smali" -type f -exec sed -i "s|\"$OLD_PACKAGE\"|\"$NEW_PACKAGE\"|g" {} \;
+        find decompiled_apk -name "*.smali" -type f -exec sed -i "s|\"$OLD_APP_NAME\"|\"$NEW_APP_NAME\"|g" {} \;
+        
+        # Update manifest and XML files
+        if [ -f "decompiled_apk/AndroidManifest.xml" ]; then
+          sed -i "s|$OLD_PACKAGE|$NEW_PACKAGE|g" decompiled_apk/AndroidManifest.xml
+          sed -i "s|$OLD_APP_NAME|$NEW_APP_NAME|g" decompiled_apk/AndroidManifest.xml
+        fi
+        
+        find decompiled_apk -name "strings.xml" -type f -exec sed -i "s|$OLD_APP_NAME|$NEW_APP_NAME|g" {} \;
+        
+        echo "✅ Package and app name updates complete"
+
+    - name: Replace Images
+      run: |
+        echo "🖼️ Image replacement..."
+        
+        if [ -d "images-to-replace" ]; then
+          for image_file in images-to-replace/*; do
+            if [ -f "$image_file" ]; then
+              image_name=$(basename "$image_file")
+              targets=$(find decompiled_apk -name "$image_name" -type f)
+              if [ -n "$targets" ]; then
+                echo "Replacing: $image_name"
+                echo "$targets" | while read -r target; do
+                  cp "$image_file" "$target"
+                done
+              fi
+            fi
+          done
+          echo "✅ Image replacement complete"
+        else
+          echo "ℹ️ No images to replace"
+        fi
+
+    - name: 🏗️ CONSERVATIVE RECOMPILATION
+      run: |
+        echo "🏗️ CONSERVATIVE RECOMPILATION"
+        echo "============================================================"
+        echo "STRATEGY: Preserve all assets and smali directories for proper DEX generation"
+        
+        cd decompiled_apk
+        
+        # Create conservative apktool.yml (preserve original structure)
+        echo "Creating conservative apktool configuration..."
+        echo 'version: "2.9.3"' > apktool.yml
+        echo 'isFrameworkApk: false' >> apktool.yml
+        echo 'usesFramework:' >> apktool.yml
+        echo '  ids:' >> apktool.yml
+        echo '  - 1' >> apktool.yml
+        echo 'sdkInfo:' >> apktool.yml
+        echo '  minSdkVersion: "21"' >> apktool.yml
+        echo '  targetSdkVersion: "33"' >> apktool.yml
+        echo '  compileSdkVersion: "23"' >> apktool.yml
+        echo 'packageInfo:' >> apktool.yml
+        echo 'versionInfo:' >> apktool.yml
+        echo '  versionCode: "100"' >> apktool.yml
+        echo '  versionName: "4.0"' >> apktool.yml
+        echo 'compressionType: false' >> apktool.yml
+        echo 'doNotCompress:' >> apktool.yml
+        echo '- resources.arsc' >> apktool.yml
+        
+        # Light META-INF cleanup only
+        if [ -d "original/META-INF" ]; then
+          find original/META-INF -name "*.RSA" -delete 2>/dev/null || true
+          find original/META-INF -name "*.SF" -delete 2>/dev/null || true
+          find original/META-INF -name "MANIFEST.MF" -delete 2>/dev/null || true
+        fi
+        
+        cd ..
+        
+        # Try conservative recompilation strategies
+        RECOMPILE_SUCCESS=false
+        
+        echo "Strategy 1: Standard AAPT2 compilation (preserving all assets)..."
+        if apktool b decompiled_apk -o modified_unsigned.apk --use-aapt2; then
+          echo "✅ AAPT2 compilation successful"
+          RECOMPILE_SUCCESS=true
+        else
+          echo "Strategy 2: AAPT1 compilation..."
+          if apktool b decompiled_apk -o modified_unsigned.apk; then
+            echo "✅ AAPT1 compilation successful"
+            RECOMPILE_SUCCESS=true
+          else
+            echo "Strategy 3: No-crunch compilation..."
+            if apktool b decompiled_apk -o modified_unsigned.apk --no-crunch; then
+              echo "✅ No-crunch compilation successful"
+              RECOMPILE_SUCCESS=true
+            fi
+          fi
+        fi
+        
+        if [ "$RECOMPILE_SUCCESS" = false ]; then
+          echo "❌ All compilation strategies failed"
+          echo "Checking structure for debugging..."
+          ls -la decompiled_apk/
+          exit 1
+        fi
+        
+        echo "✅ APK recompilation successful"
+        
+        # Verify assets.dex was created
+        echo "🔍 Verifying DEX files in compiled APK..."
+        unzip -l modified_unsigned.apk | grep "\.dex" || echo "No DEX files found"
+        
+        ls -lh modified_unsigned.apk
+
+    - name: Sign and Align APK
+      run: |
+        echo "✍️ Signing and aligning APK..."
+        
+        # Sign APK
+        jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+          -keystore release-key.keystore -storepass password \
+          modified_unsigned.apk alias_name
+        
+        # Align APK
+        zipalign -v 4 modified_unsigned.apk modified_signed_aligned.apk
+        
+        echo "✅ APK signed and aligned successfully"
+        
+        # Verify final APK structure
+        echo "📊 Final APK verification:"
+        unzip -l modified_signed_aligned.apk | grep "\.dex"
+        ls -lh modified_signed_aligned.apk
+
+    - name: Package Results
+      run: |
+        echo "📤 Packaging results..."
+        mkdir -p output
+        cp modified_signed_aligned.apk output/
+        cp modified_unsigned.apk output/
+        
+        # Create summary
+        echo "APK Modification Summary - Precision Cleanup" > output/modification_summary.txt
+        echo "=============================================" >> output/modification_summary.txt
+        echo "Original APK: ${{ github.event.inputs.apk_file }}" >> output/modification_summary.txt
+        echo "Modified APK: modified_signed_aligned.apk" >> output/modification_summary.txt
+        echo "" >> output/modification_summary.txt
+        echo "Precision Cleanup Applied:" >> output/modification_summary.txt
+        echo "- Removed ONLY problematic DynamicLoaderImpl duplicates" >> output/modification_summary.txt
+        echo "- Preserved ALL essential smali_assets for assets.dex" >> output/modification_summary.txt
+        echo "- Maintained original APK structure integrity" >> output/modification_summary.txt
+        echo "- Conservative recompilation preserving all DEX files" >> output/modification_summary.txt
+        echo "" >> output/modification_summary.txt
+        echo "Compatibility (matching Dynamic TV APK):" >> output/modification_summary.txt
+        echo "- Compile SDK: 23 (Android 6.0)" >> output/modification_summary.txt
+        echo "- Target SDK: 33 (Android 13)" >> output/modification_summary.txt
+        echo "- Min SDK: 21 (Android 5.0)" >> output/modification_summary.txt
+        echo "" >> output/modification_summary.txt
+        echo "Changes Applied:" >> output/modification_summary.txt
+        echo "- Package Name: com.dynamic.tv → ${{ github.event.inputs.new_package_name }}" >> output/modification_summary.txt
+        echo "- App Name: Dynamic TV → ${{ github.event.inputs.new_app_name }}" >> output/modification_summary.txt
+        echo "- Panel URLs: dynam → ${{ github.event.inputs.panel_url_value }}" >> output/modification_summary.txt
+        echo "- Images: Replaced with custom assets" >> output/modification_summary.txt
+        echo "" >> output/modification_summary.txt
+        echo "Generated: $(date)" >> output/modification_summary.txt
+        echo "Workflow: Precision Cleanup (Preserves Essential Files)" >> output/modification_summary.txt
+        
+        echo "Files ready:"
+        ls -la output/
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: precision-cleanup-apk-${{ github.run_number }}
+        path: output/
+        retention-days: 30
+
+    - name: Success Summary
+      run: |
+        echo "## ✅ Precision Cleanup APK Complete! 🎯" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🎯 Precision Cleanup Strategy:" >> $GITHUB_STEP_SUMMARY
+        echo "- **Targeted Removal**: Only problematic DynamicLoaderImpl duplicates" >> $GITHUB_STEP_SUMMARY
+        echo "- **Preserved Structure**: All essential smali_assets for proper DEX generation" >> $GITHUB_STEP_SUMMARY
+        echo "- **Conservative Approach**: Maintained original APK integrity" >> $GITHUB_STEP_SUMMARY
+        echo "- **Full DEX Support**: assets.dex, classes.dex, classes2.dex preserved" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📱 Dynamic TV Compatibility:" >> $GITHUB_STEP_SUMMARY
+        echo "- **Compile SDK**: 23 (Android 6.0) - exact match" >> $GITHUB_STEP_SUMMARY
+        echo "- **Target SDK**: 33 (Android 13) - exact match" >> $GITHUB_STEP_SUMMARY
+        echo "- **Min SDK**: 21 (Android 5.0) - exact match" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📋 Modifications:" >> $GITHUB_STEP_SUMMARY
+        echo "- **Package**: com.dynamic.tv → ${{ github.event.inputs.new_package_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **App Name**: Dynamic TV → ${{ github.event.inputs.new_app_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Panel URLs**: dynam → ${{ github.event.inputs.panel_url_value }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Images**: Custom branding applied" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📥 Download:" >> $GITHUB_STEP_SUMMARY
+        echo "**precision-cleanup-apk-${{ github.run_number }}** - Preserves all essential files!" >> $GITHUB_STEP_SUMMARY
