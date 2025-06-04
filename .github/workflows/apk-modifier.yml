@@ -18,6 +18,11 @@ on:
         required: true
         default: 'SI TV'
         type: string
+      panel_url_value:
+        description: 'Panel URL value (replaces "dynam" in https://rebrandking.com/panels/SM4trio/VALUE/api/)'
+        required: true
+        default: 'sitv'
+        type: string
 
 jobs:
   modify-apk:
@@ -121,6 +126,64 @@ jobs:
         
         cd ..
         echo "Duplicate class cleanup completed"
+
+    - name: Replace panel URL values
+      run: |
+        OLD_PANEL_VALUE="dynam"
+        NEW_PANEL_VALUE="${{ github.event.inputs.panel_url_value }}"
+        
+        echo "Replacing panel URL values:"
+        echo "  Old: $OLD_PANEL_VALUE"
+        echo "  New: $NEW_PANEL_VALUE"
+        
+        # Search for panel URL patterns and count them first
+        echo "Searching for panel URL patterns..."
+        
+        # Pattern 1: URLs ending with /api/
+        API_PATTERN="https://rebrandking.com/panels/SM4trio/$OLD_PANEL_VALUE/api/"
+        API_REPLACEMENT="https://rebrandking.com/panels/SM4trio/$NEW_PANEL_VALUE/api/"
+        
+        # Pattern 2: URLs ending without /api/
+        NO_API_PATTERN="https://rebrandking.com/panels/SM4trio/$OLD_PANEL_VALUE/"
+        NO_API_REPLACEMENT="https://rebrandking.com/panels/SM4trio/$NEW_PANEL_VALUE/"
+        
+        # Count occurrences before replacement
+        API_COUNT=$(grep -r "$API_PATTERN" decompiled_apk/ --include="*.smali" | wc -l)
+        NO_API_COUNT=$(grep -r "$NO_API_PATTERN" decompiled_apk/ --include="*.smali" | wc -l)
+        
+        echo "Found $API_COUNT instances of URL with /api/"
+        echo "Found $NO_API_COUNT instances of URL without /api/"
+        
+        # Show the files that contain these URLs
+        echo "Files containing panel URLs:"
+        grep -r "rebrandking.com/panels/SM4trio/$OLD_PANEL_VALUE" decompiled_apk/ --include="*.smali" -l
+        
+        # Replace URLs with /api/
+        if [ $API_COUNT -gt 0 ]; then
+          echo "Replacing URLs with /api/..."
+          find decompiled_apk -name "*.smali" -type f -exec sed -i "s|$API_PATTERN|$API_REPLACEMENT|g" {} \;
+        fi
+        
+        # Replace URLs without /api/
+        if [ $NO_API_COUNT -gt 0 ]; then
+          echo "Replacing URLs without /api/..."
+          find decompiled_apk -name "*.smali" -type f -exec sed -i "s|$NO_API_PATTERN|$NO_API_REPLACEMENT|g" {} \;
+        fi
+        
+        # Verify replacements
+        NEW_API_COUNT=$(grep -r "$API_REPLACEMENT" decompiled_apk/ --include="*.smali" | wc -l)
+        NEW_NO_API_COUNT=$(grep -r "$NO_API_REPLACEMENT" decompiled_apk/ --include="*.smali" | wc -l)
+        
+        echo "After replacement:"
+        echo "  URLs with /api/: $NEW_API_COUNT"
+        echo "  URLs without /api/: $NEW_NO_API_COUNT"
+        echo "  Total URLs updated: $((NEW_API_COUNT + NEW_NO_API_COUNT))"
+        
+        # Show some examples of the replaced URLs
+        echo "Sample replaced URLs:"
+        grep -r "rebrandking.com/panels/SM4trio/$NEW_PANEL_VALUE" decompiled_apk/ --include="*.smali" | head -3
+        
+        echo "Panel URL replacement completed"
 
     - name: Replace package name in smali files
       run: |
@@ -383,6 +446,7 @@ jobs:
         Changes Made:
         - Package Name: com.dynamic.tv → ${{ github.event.inputs.new_package_name }}
         - App Name: Dynamic TV → ${{ github.event.inputs.new_app_name }}
+        - Panel URL: dynam → ${{ github.event.inputs.panel_url_value }}
         - Images: Replaced with assets from images-to-replace/ folder
         - APK: Recompiled and signed
         - Fixed: Duplicate class issues resolved
@@ -415,6 +479,7 @@ jobs:
         echo "- **Original APK:** ${{ github.event.inputs.apk_file }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Package Name:** com.dynamic.tv → ${{ github.event.inputs.new_package_name }}" >> $GITHUB_STEP_SUMMARY
         echo "- **App Name:** Dynamic TV → ${{ github.event.inputs.new_app_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Panel URL Value:** dynam → ${{ github.event.inputs.panel_url_value }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Images:** Replaced with provided assets" >> $GITHUB_STEP_SUMMARY
         echo "- **Fixed:** Duplicate class conflicts resolved" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
