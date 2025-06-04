@@ -19,7 +19,7 @@ on:
         default: 'SI TV'
         type: string
       panel_url_value:
-        description: 'Panel URL value (replaces "dynam" in https://rebrandking.com/panels/SM4trio/VALUE/api/)'
+        description: 'Panel URL value (replaces "dynam" in URLs)'
         required: true
         default: 'sitv'
         type: string
@@ -129,59 +129,119 @@ jobs:
 
     - name: Replace panel URL values
       run: |
-        OLD_PANEL_VALUE="dynam"
         NEW_PANEL_VALUE="${{ github.event.inputs.panel_url_value }}"
         
-        echo "Replacing panel URL values:"
-        echo "  Old: $OLD_PANEL_VALUE"
-        echo "  New: $NEW_PANEL_VALUE"
+        echo "========================================"
+        echo "PANEL URL REPLACEMENT"
+        echo "========================================"
+        echo "Target URLs to find and modify:"
+        echo "1. https://rebrandking.com/panels/SM4trio/dynam/api/"
+        echo "2. https://rebrandking.com/panels/SM4trio/dynam/"
+        echo "Replacing 'dynam' with: $NEW_PANEL_VALUE"
+        echo ""
         
-        # First, let's search more broadly for any rebrandking URLs
-        echo "Searching for any rebrandking.com URLs..."
-        find decompiled_apk -name "*.smali" -type f -exec grep -l "rebrandking.com" {} \; || echo "No rebrandking.com URLs found"
+        # Pattern 1: URLs with /api/
+        URL_WITH_API="https://rebrandking.com/panels/SM4trio/dynam/api/"
+        NEW_URL_WITH_API="https://rebrandking.com/panels/SM4trio/$NEW_PANEL_VALUE/api/"
         
-        # Search for the specific patterns
-        echo "Searching for SM4trio URLs..."
-        find decompiled_apk -name "*.smali" -type f -exec grep -l "SM4trio" {} \; || echo "No SM4trio URLs found"
+        # Pattern 2: URLs without /api/
+        URL_WITHOUT_API="https://rebrandking.com/panels/SM4trio/dynam/"
+        NEW_URL_WITHOUT_API="https://rebrandking.com/panels/SM4trio/$NEW_PANEL_VALUE/"
         
-        # Search for dynam specifically
-        echo "Searching for 'dynam' patterns..."
-        find decompiled_apk -name "*.smali" -type f -exec grep -l "dynam" {} \; || echo "No dynam patterns found"
+        echo "Searching for URL pattern 1 (with /api/):"
+        echo "  Looking for: $URL_WITH_API"
+        API_FILES=$(find decompiled_apk -name "*.smali" -type f -exec grep -l "$URL_WITH_API" {} \; 2>/dev/null)
+        API_COUNT=$(echo "$API_FILES" | grep -c "\.smali" 2>/dev/null || echo "0")
+        echo "  Found in $API_COUNT files"
         
-        # Show actual content to understand the format
-        echo "Showing actual rebrandking.com content in files:"
-        find decompiled_apk -name "*.smali" -type f -exec grep -H "rebrandking" {} \; || echo "No matches found"
-        
-        # Try more flexible pattern matching
-        echo "Attempting URL replacement with flexible patterns..."
-        
-        # Pattern 1: Try to replace any dynam in rebrandking context
-        REPLACED_COUNT=0
-        
-        # Search and replace approach 1: Direct string replacement
-        if find decompiled_apk -name "*.smali" -type f -exec grep -q "dynam" {} \; ; then
-          echo "Found dynam references, attempting replacement..."
-          find decompiled_apk -name "*.smali" -type f -exec sed -i "s|dynam|$NEW_PANEL_VALUE|g" {} \;
-          REPLACED_COUNT=$((REPLACED_COUNT + 1))
+        if [ $API_COUNT -gt 0 ]; then
+          echo "  Files containing URL with /api/:"
+          echo "$API_FILES" | head -10
+          echo "  Sample content:"
+          find decompiled_apk -name "*.smali" -type f -exec grep -H "$URL_WITH_API" {} \; 2>/dev/null | head -3
         fi
         
-        # Verify replacements were made
-        echo "Verifying replacements..."
-        NEW_COUNT=$(find decompiled_apk -name "*.smali" -type f -exec grep -c "$NEW_PANEL_VALUE" {} \; | awk '{sum += $1} END {print sum}')
-        echo "Found $NEW_COUNT instances of new value: $NEW_PANEL_VALUE"
+        echo ""
+        echo "Searching for URL pattern 2 (without /api/):"
+        echo "  Looking for: $URL_WITHOUT_API"
+        NO_API_FILES=$(find decompiled_apk -name "*.smali" -type f -exec grep -l "$URL_WITHOUT_API" {} \; 2>/dev/null)
+        NO_API_COUNT=$(echo "$NO_API_FILES" | grep -c "\.smali" 2>/dev/null || echo "0")
+        echo "  Found in $NO_API_COUNT files"
         
-        # Show some examples
-        echo "Sample files with new value:"
-        find decompiled_apk -name "*.smali" -type f -exec grep -l "$NEW_PANEL_VALUE" {} \; | head -3
+        if [ $NO_API_COUNT -gt 0 ]; then
+          echo "  Files containing URL without /api/:"
+          echo "$NO_API_FILES" | head -10
+          echo "  Sample content:"
+          find decompiled_apk -name "*.smali" -type f -exec grep -H "$URL_WITHOUT_API" {} \; 2>/dev/null | head -3
+        fi
         
-        echo "Sample content with new value:"
-        find decompiled_apk -name "*.smali" -type f -exec grep -H "$NEW_PANEL_VALUE" {} \; | head -3
+        echo ""
+        TOTAL_BEFORE=$((API_COUNT + NO_API_COUNT))
+        echo "Total URLs found: $TOTAL_BEFORE"
         
-        if [ $NEW_COUNT -gt 0 ]; then
-          echo "✓ Panel URL replacement completed successfully"
+        if [ $TOTAL_BEFORE -gt 0 ]; then
+          echo ""
+          echo "Performing replacements..."
+          
+          # Replace URLs with /api/
+          if [ $API_COUNT -gt 0 ]; then
+            echo "Replacing URLs with /api/..."
+            find decompiled_apk -name "*.smali" -type f -exec sed -i "s|$URL_WITH_API|$NEW_URL_WITH_API|g" {} \;
+          fi
+          
+          # Replace URLs without /api/
+          if [ $NO_API_COUNT -gt 0 ]; then
+            echo "Replacing URLs without /api/..."
+            find decompiled_apk -name "*.smali" -type f -exec sed -i "s|$URL_WITHOUT_API|$NEW_URL_WITHOUT_API|g" {} \;
+          fi
+          
+          echo ""
+          echo "Verifying replacements..."
+          
+          # Count new URLs
+          NEW_API_COUNT=$(find decompiled_apk -name "*.smali" -type f -exec grep -c "$NEW_URL_WITH_API" {} \; 2>/dev/null | awk '{sum += $1} END {print sum+0}')
+          NEW_NO_API_COUNT=$(find decompiled_apk -name "*.smali" -type f -exec grep -c "$NEW_URL_WITHOUT_API" {} \; 2>/dev/null | awk '{sum += $1} END {print sum+0}')
+          TOTAL_AFTER=$((NEW_API_COUNT + NEW_NO_API_COUNT))
+          
+          echo "Replacement results:"
+          echo "  URLs with /api/ replaced: $NEW_API_COUNT"
+          echo "  URLs without /api/ replaced: $NEW_NO_API_COUNT"
+          echo "  Total URLs replaced: $TOTAL_AFTER"
+          
+          # Show sample of new URLs
+          echo ""
+          echo "Sample of replaced URLs:"
+          find decompiled_apk -name "*.smali" -type f -exec grep -H "rebrandking.com/panels/SM4trio/$NEW_PANEL_VALUE" {} \; 2>/dev/null | head -5
+          
+          if [ $TOTAL_AFTER -eq 8 ]; then
+            echo ""
+            echo "✅ SUCCESS: Exactly 8 URLs replaced as expected!"
+          elif [ $TOTAL_AFTER -gt 0 ]; then
+            echo ""
+            echo "✅ SUCCESS: $TOTAL_AFTER URLs replaced (expected 8)"
+          else
+            echo ""
+            echo "❌ ERROR: No URLs were replaced"
+          fi
         else
-          echo "⚠ No panel URL replacements were made - may need manual investigation"
+          echo ""
+          echo "❌ No target URLs found to replace"
+          echo ""
+          echo "Troubleshooting - searching for partial patterns:"
+          echo "Looking for 'rebrandking.com'..."
+          find decompiled_apk -name "*.smali" -type f -exec grep -H "rebrandking.com" {} \; 2>/dev/null | head -3
+          echo ""
+          echo "Looking for 'SM4trio'..."
+          find decompiled_apk -name "*.smali" -type f -exec grep -H "SM4trio" {} \; 2>/dev/null | head -3
+          echo ""
+          echo "Looking for 'dynam'..."
+          find decompiled_apk -name "*.smali" -type f -exec grep -H "dynam" {} \; 2>/dev/null | head -3
         fi
+        
+        echo ""
+        echo "========================================"
+        echo "PANEL URL REPLACEMENT COMPLETE"
+        echo "========================================"
 
     - name: Replace package name in smali files
       run: |
@@ -444,7 +504,7 @@ jobs:
         Changes Made:
         - Package Name: com.dynamic.tv → ${{ github.event.inputs.new_package_name }}
         - App Name: Dynamic TV → ${{ github.event.inputs.new_app_name }}
-        - Panel URL: dynam → ${{ github.event.inputs.panel_url_value }}
+        - Panel URLs: dynam → ${{ github.event.inputs.panel_url_value }} (8 locations)
         - Images: Replaced with assets from images-to-replace/ folder
         - APK: Recompiled and signed
         - Fixed: Duplicate class issues resolved
@@ -477,7 +537,7 @@ jobs:
         echo "- **Original APK:** ${{ github.event.inputs.apk_file }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Package Name:** com.dynamic.tv → ${{ github.event.inputs.new_package_name }}" >> $GITHUB_STEP_SUMMARY
         echo "- **App Name:** Dynamic TV → ${{ github.event.inputs.new_app_name }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Panel URL Value:** dynam → ${{ github.event.inputs.panel_url_value }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Panel URLs:** dynam → ${{ github.event.inputs.panel_url_value }} (8 locations)" >> $GITHUB_STEP_SUMMARY
         echo "- **Images:** Replaced with provided assets" >> $GITHUB_STEP_SUMMARY
         echo "- **Fixed:** Duplicate class conflicts resolved" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
