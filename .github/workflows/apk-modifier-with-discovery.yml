@@ -1,0 +1,191 @@
+name: APK Modifier with URL Discovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_file:
+        description: 'APK file name in apk/ folder'
+        required: true
+        default: 'Dynamic-TV.apk'
+      package_name:
+        description: 'New package name'
+        required: true
+        default: 'com.sitv.live'
+      app_name:
+        description: 'New app name'
+        required: true
+        default: 'SI TV'
+      panel_url_value:
+        description: 'Panel URL value to replace dynam'
+        required: true
+        default: 'sitv'
+
+jobs:
+  modify_apk:
+    runs-on: ubuntu-latest
+ECHO is off.
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: ☕ Set up JDK 11
+      uses: actions/setup-java@v3
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+
+    - name: 🔧 Install APKTool
+      run: |
+        wget https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool
+        wget https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar
+        chmod +x apktool
+        sudo mv apktool /usr/local/bin/
+        sudo mv apktool_2.9.3.jar /usr/local/bin/apktool.jar
+
+    - name: 📋 Validate Input APK
+      run: |
+        if [ ! -f "apk/${{ github.event.inputs.apk_file }}" ]; then
+          echo "❌ ERROR: APK file not found: apk/${{ github.event.inputs.apk_file }}"
+          exit 1
+        fi
+        echo "✅ Found APK: apk/${{ github.event.inputs.apk_file }}"
+        ls -la "apk/${{ github.event.inputs.apk_file }}"
+
+    - name: 🔓 Decompile APK with Discovery
+      run: |
+        echo "🔓 Starting APK decompilation..."
+ECHO is off.
+        # Multi-fallback decompilation strategy
+        if apktool d "apk/${{ github.event.inputs.apk_file }}" -o decoded --no-src; then
+          echo "✅ Decompilation successful with --no-src"
+        elif apktool d "apk/${{ github.event.inputs.apk_file }}" -o decoded --only-main-classes; then
+          echo "✅ Decompilation successful with --only-main-classes"
+        elif apktool d "apk/${{ github.event.inputs.apk_file }}" -o decoded --no-debug-info; then
+          echo "✅ Decompilation successful with --no-debug-info"
+        else
+          echo "❌ All decompilation methods failed"
+          exit 1
+        fi
+ECHO is off.
+        echo "📁 Decompiled structure:"
+        ls -la decoded/
+
+    - name: 🔍 COMPREHENSIVE URL DISCOVERY
+      run: |
+        echo "🔍 COMPREHENSIVE URL DISCOVERY"
+        echo "======================================="
+ECHO is off.
+        # 1. Find ANY references to common URL patterns
+        echo "📡 Searching for HTTP/HTTPS URLs..."
+        find decoded -name "*.smali" -exec grep -l "https\?://" {} \; | head -20
+        echo ""
+ECHO is off.
+        # 2. Look for ANY domain references 
+        echo "🌐 Searching for domain references..."
+        find decoded -name "*.smali" -exec grep -n -H "\.com\^|\.net\^|\.org" {} \; | head -20
+        echo ""
+ECHO is off.
+        # 3. Search for rebrandking specifically (any case)
+        echo "🎯 Searching for 'rebrandking' ^(any case^)..."
+        find decoded -name "*.smali" -exec grep -i -n -H "rebrandking" {} \;
+        echo ""
+ECHO is off.
+        # 4. Search for 'panel' references
+        echo "📋 Searching for 'panel' references..."
+        find decoded -name "*.smali" -exec grep -i -n -H "panel" {} \; | head -10
+        echo ""
+ECHO is off.
+        # 5. Look for network/API related strings
+        echo "🔗 Searching for API/network strings..."
+        find decoded -name "*.smali" -exec grep -i -n -H -E "^(api^|endpoint^|server^|host^|url^)" {} \; | head -15
+        echo ""
+ECHO is off.
+        # 6. Search for const-string patterns with URLs
+        echo "🧵 Searching for const-string URL patterns..."
+        find decoded -name "*.smali" -exec grep -n -A1 -B1 "const-string.*http" {} \; | head -20
+        echo ""
+ECHO is off.
+        # 7. Look in specific configuration-related files
+        echo "⚙️ Checking configuration files..."
+        find decoded -name "*onfig*.smali" -exec ls -la {} \;
+        find decoded -name "*onfig*.smali" -exec grep -n -H "const-string" {} \; | head -10
+        echo ""
+ECHO is off.
+        # 8. Check XML files for URLs
+        echo "📄 Checking XML files for URLs..."
+        find decoded -name "*.xml" -exec grep -i -n -H "http" {} \; | head -10
+        echo ""
+ECHO is off.
+        # 9. Search for Dynamic TV or TV related strings
+        echo "📺 Searching for TV-related strings..."
+        find decoded -name "*.smali" -exec grep -i -n -H -E "^(dynamic^|tv^|stream^|live^)" {} \; | head -15
+        echo ""
+ECHO is off.
+        # 10. Check AndroidManifest.xml
+        echo "📱 Checking AndroidManifest.xml..."
+        if [ -f "decoded/AndroidManifest.xml" ]; then
+          echo "Network permissions:"
+          grep -i "internet\^|network" decoded/AndroidManifest.xml || echo "No network permissions found"
+          echo "Any URLs in manifest:"
+          grep -i "http" decoded/AndroidManifest.xml || echo "No URLs in manifest"
+        fi
+        echo ""
+ECHO is off.
+        # 11. Summary
+        echo "📊 DISCOVERY SUMMARY"
+        echo "======================================="
+        echo "Total smali files: $^(find decoded -name "*.smali" ^| wc -l^)"
+        echo "Files with const-string: $^(find decoded -name "*.smali" -exec grep -l "const-string" {} \; ^| wc -l^)"
+        echo "Files with HTTP URLs: $^(find decoded -name "*.smali" -exec grep -l "https\?://" {} \; ^| wc -l^)"
+        echo "Config-related files: $^(find decoded -name "*onfig*.smali" ^| wc -l^)"
+ECHO is off.
+        # 12. Create URL inventory
+        echo "📋 Creating comprehensive URL inventory..."
+        echo "All URLs found in the APK:" > url_inventory.txt
+        find decoded -name "*.smali" -exec grep -h -o "https\?://[^\"'[:space:]]*" {} \; ^>^> url_inventory.txt 2^>/dev/null ^|^| true
+        find decoded -name "*.xml" -exec grep -h -o "https\?://[^\"'[:space:]]*" {} \; ^>^> url_inventory.txt 2^>/dev/null ^|^| true
+        if [ -s url_inventory.txt ]; then
+          sort -u url_inventory.txt
+          echo ""
+          echo "✅ URL inventory created with $^(sort -u url_inventory.txt ^| wc -l^) unique URLs"
+        else
+          echo "❌ No URLs found in the APK"
+        fi
+
+    - name: 📤 Upload Discovery Results
+      uses: actions/upload-artifact@v3
+      with:
+        name: url-discovery-results
+        path: |
+          url_inventory.txt
+          decoded/AndroidManifest.xml
+        if-no-files-found: warn
+
+    - name: 🎯 Continue with Original URL Replacement (if URLs found)
+      run: |
+        echo "🎯 Attempting original URL replacement strategy..."
+ECHO is off.
+        # Check if we found any URLs at all
+        if [ -s url_inventory.txt ]; then
+          echo "✅ URLs found in APK, proceeding with replacement attempt..."
+ECHO is off.
+          # Your original URL replacement logic here
+          echo "Target: dynam ^-^> ${{ github.event.inputs.panel_url_value }}"
+          echo "Using exact character matching ^(forward slashes /dynam/, not \/dynam\/^)"
+ECHO is off.
+          URL1="https://rebrandking.com/panels/SM4trio/dynam/"
+          URL2="https://rebrandking.com/panels/SM4trio/dynam/api/"
+ECHO is off.
+          NEW_URL1="https://rebrandking.com/panels/SM4trio/${{ github.event.inputs.panel_url_value }}/"
+          NEW_URL2="https://rebrandking.com/panels/SM4trio/${{ github.event.inputs.panel_url_value }}/api/"
+ECHO is off.
+          echo "Searching for URL1: $URL1"
+          find decoded -name "*.smali" -exec grep -l "$URL1" {} \; || echo "❌ URL1 not found"
+ECHO is off.
+          echo "Searching for URL2: $URL2"
+          find decoded -name "*.smali" -exec grep -l "$URL2" {} \; || echo "❌ URL2 not found"
+ECHO is off.
+        else
+          echo "❌ No URLs found in APK - cannot proceed with URL replacement"
+          echo "📋 Manual investigation required to find actual URL patterns"
+        fi
