@@ -336,7 +336,6 @@ compressionType: false
 doNotCompress:
 - resources.arsc
 - META-INF/services/javax.annotation.processing.Processor
-EOF
         fi
         
         # Clean META-INF more thoroughly
