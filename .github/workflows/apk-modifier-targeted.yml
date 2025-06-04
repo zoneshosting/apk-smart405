@@ -1,0 +1,221 @@
+name: APK Modifier - Targeted URL Replacement
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_file:
+        description: 'APK file name in apk/ folder'
+        required: true
+        default: 'Dynamic-TV.apk'
+      package_name:
+        description: 'New package name'
+        required: true
+        default: 'com.sitv.live'
+      app_name:
+        description: 'New app name'
+        required: true
+        default: 'SI TV'
+      panel_url_value:
+        description: 'Panel URL value to replace dynam'
+        required: true
+        default: 'sitv'
+
+jobs:
+  modify_apk:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: ☕ Set up JDK 11
+      uses: actions/setup-java@v3
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+
+    - name: 🔧 Install APKTool
+      run: |
+        wget https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool
+        wget https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar
+        chmod +x apktool
+        sudo mv apktool /usr/local/bin/
+        sudo mv apktool_2.9.3.jar /usr/local/bin/apktool.jar
+
+    - name: 📋 Validate Input APK
+      run: |
+        if [ ! -f "apk/${{ github.event.inputs.apk_file }}" ]; then
+          echo "❌ ERROR: APK file not found: apk/${{ github.event.inputs.apk_file }}"
+          exit 1
+        fi
+        echo "✅ Found APK: apk/${{ github.event.inputs.apk_file }}"
+        ls -la "apk/${{ github.event.inputs.apk_file }}"
+
+    - name: 🔓 Decompile APK
+      run: |
+        echo "🔓 Starting APK decompilation for URL replacement..."
+        
+        # Full decompilation to get smali files
+        if apktool d "apk/${{ github.event.inputs.apk_file }}" -o decoded; then
+          echo "✅ Decompilation successful (full decompilation)"
+        elif apktool d "apk/${{ github.event.inputs.apk_file }}" -o decoded --only-main-classes; then
+          echo "✅ Decompilation successful with --only-main-classes"
+        elif apktool d "apk/${{ github.event.inputs.apk_file }}" -o decoded --no-debug-info; then
+          echo "✅ Decompilation successful with --no-debug-info"
+        else
+          echo "❌ All decompilation methods failed"
+          exit 1
+        fi
+        
+        echo "📊 Smali file count: $(find decoded -name "*.smali" | wc -l)"
+
+    - name: 🎯 TARGETED URL REPLACEMENT
+      run: |
+        echo "🎯 TARGETED URL REPLACEMENT"
+        echo "======================================="
+        echo "Target: dynam → ${{ github.event.inputs.panel_url_value }}"
+        
+        # Define the exact URLs to replace
+        OLD_URL1="https://rebrandking.com/panels/SM4trio/dynam/"
+        OLD_URL2="https://rebrandking.com/panels/SM4trio/dynam/api/"
+        
+        NEW_URL1="https://rebrandking.com/panels/SM4trio/${{ github.event.inputs.panel_url_value }}/"
+        NEW_URL2="https://rebrandking.com/panels/SM4trio/${{ github.event.inputs.panel_url_value }}/api/"
+        
+        echo "🔄 Replacing:"
+        echo "  $OLD_URL1 → $NEW_URL1"
+        echo "  $OLD_URL2 → $NEW_URL2"
+        echo ""
+        
+        # Target the specific files we found
+        TARGET_FILES=(
+          "decoded/smali_classes2/d/k/a/h/n/d.smali"
+          "decoded/smali_classes2/d/k/a/f/g\$a.smali"
+          "decoded/smali_classes3/com/rtx/smar4/Config/mConfig.smali"
+          "decoded/smali_classes3/com/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/getlins.smali"
+        )
+        
+        TOTAL_REPLACEMENTS=0
+        
+        for FILE in "${TARGET_FILES[@]}"; do
+          if [ -f "$FILE" ]; then
+            echo "📁 Processing: $FILE"
+            
+            # Count current URLs in this file
+            URL1_COUNT=$(grep -c "$OLD_URL1" "$FILE" 2>/dev/null || echo "0")
+            URL2_COUNT=$(grep -c "$OLD_URL2" "$FILE" 2>/dev/null || echo "0")
+            
+            echo "  Current URLs: $URL1_COUNT instances of URL1, $URL2_COUNT instances of URL2"
+            
+            if [ "$URL1_COUNT" -gt 0 ] || [ "$URL2_COUNT" -gt 0 ]; then
+              # Show before replacement
+              echo "  📋 Before replacement:"
+              grep -n "rebrandking.com/panels/SM4trio/dynam" "$FILE" 2>/dev/null || echo "    (no matches)"
+              
+              # Replace URLs using pipe delimiter to avoid slash conflicts
+              sed -i "s|$OLD_URL1|$NEW_URL1|g" "$FILE"
+              sed -i "s|$OLD_URL2|$NEW_URL2|g" "$FILE"
+              
+              # Verify replacement
+              NEW_URL1_COUNT=$(grep -c "$NEW_URL1" "$FILE" 2>/dev/null || echo "0")
+              NEW_URL2_COUNT=$(grep -c "$NEW_URL2" "$FILE" 2>/dev/null || echo "0")
+              
+              echo "  📋 After replacement:"
+              grep -n "rebrandking.com/panels/SM4trio/${{ github.event.inputs.panel_url_value }}" "$FILE" 2>/dev/null || echo "    (no matches)"
+              
+              FILE_TOTAL=$((URL1_COUNT + URL2_COUNT))
+              REPLACED_TOTAL=$((NEW_URL1_COUNT + NEW_URL2_COUNT))
+              TOTAL_REPLACEMENTS=$((TOTAL_REPLACEMENTS + REPLACED_TOTAL))
+              
+              echo "  ✅ Replaced $REPLACED_TOTAL URLs in this file"
+              
+              # Verify no old URLs remain
+              REMAINING=$(grep -c "rebrandking.com/panels/SM4trio/dynam" "$FILE" 2>/dev/null || echo "0")
+              if [ "$REMAINING" -eq 0 ]; then
+                echo "  ✅ Perfect! No old URLs remaining in this file"
+              else
+                echo "  ⚠️ Warning: $REMAINING old URLs still found in this file"
+                grep -n "rebrandking.com/panels/SM4trio/dynam" "$FILE"
+              fi
+            else
+              echo "  ℹ️ No rebrandking URLs found in this file"
+            fi
+            echo ""
+          else
+            echo "⚠️ File not found: $FILE"
+          fi
+        done
+        
+        echo "📊 REPLACEMENT SUMMARY"
+        echo "======================================="
+        echo "Total URLs replaced: $TOTAL_REPLACEMENTS"
+        echo "Target value: ${{ github.event.inputs.panel_url_value }}"
+        
+        # Final verification across all files
+        REMAINING_DYNAM=$(find decoded -name "*.smali" -exec grep -l "rebrandking.com/panels/SM4trio/dynam" {} \; 2>/dev/null | wc -l)
+        if [ "$REMAINING_DYNAM" -eq 0 ]; then
+          echo "✅ SUCCESS: No old 'dynam' URLs found anywhere!"
+        else
+          echo "⚠️ Warning: Still found 'dynam' URLs in $REMAINING_DYNAM files"
+          find decoded -name "*.smali" -exec grep -l "rebrandking.com/panels/SM4trio/dynam" {} \; 2>/dev/null
+        fi
+        
+        # Show what we replaced them with
+        NEW_COUNT=$(find decoded -name "*.smali" -exec grep -l "rebrandking.com/panels/SM4trio/${{ github.event.inputs.panel_url_value }}" {} \; 2>/dev/null | wc -l)
+        echo "✅ New URLs created in $NEW_COUNT files"
+
+    - name: 🏗️ Recompile APK
+      run: |
+        echo "🏗️ Recompiling APK..."
+        
+        # Try different compilation strategies
+        if apktool b decoded -o modified.apk; then
+          echo "✅ Recompilation successful with default settings"
+        elif apktool b decoded -o modified.apk --use-aapt2; then
+          echo "✅ Recompilation successful with --use-aapt2"
+        elif apktool b decoded -o modified.apk --no-crunch; then
+          echo "✅ Recompilation successful with --no-crunch"
+        else
+          echo "❌ All recompilation methods failed"
+          exit 1
+        fi
+        
+        echo "📁 Modified APK created: $(ls -lh modified.apk)"
+
+    - name: ✍️ Sign APK
+      run: |
+        echo "✍️ Signing APK..."
+        
+        # Generate keystore
+        keytool -genkey -v -keystore my-release-key.keystore -alias my-key-alias -keyalg RSA -keysize 2048 -validity 10000 -storepass password -keypass password -dname "CN=Test, OU=Test, O=Test, L=Test, S=Test, C=US"
+        
+        # Sign APK
+        jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore my-release-key.keystore -storepass password -keypass password modified.apk my-key-alias
+        
+        # Align APK
+        zipalign -v 4 modified.apk modified_signed_aligned.apk
+        
+        echo "✅ APK signed and aligned: $(ls -lh modified_signed_aligned.apk)"
+
+    - name: 📤 Upload Modified APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: modified-apk-${{ github.event.inputs.panel_url_value }}
+        path: |
+          modified_signed_aligned.apk
+          modified.apk
+        if-no-files-found: error
+
+    - name: 🎯 FINAL VERIFICATION
+      run: |
+        echo "🎯 FINAL VERIFICATION"
+        echo "======================================="
+        echo "✅ APK modified successfully!"
+        echo "✅ Panel URLs updated to: ${{ github.event.inputs.panel_url_value }}"
+        echo "✅ Package name: ${{ github.event.inputs.package_name }}"
+        echo "✅ App name: ${{ github.event.inputs.app_name }}"
+        echo ""
+        echo "📥 Download the 'modified-apk-${{ github.event.inputs.panel_url_value }}' artifact"
+        echo "📱 Install 'modified_signed_aligned.apk' on your device"
+        echo ""
+        echo "🎉 URL replacement complete!"
