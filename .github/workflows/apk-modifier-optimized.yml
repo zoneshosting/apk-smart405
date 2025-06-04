@@ -1,0 +1,490 @@
+name: APK Modifier - Optimized
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_file:
+        description: 'Name of the APK file to modify (should be in apk/ folder)'
+        required: true
+        default: 'Dynamic-TV.apk'
+        type: string
+      new_package_name:
+        description: 'New package name'
+        required: true
+        default: 'com.sitv.live'
+        type: string
+      new_app_name:
+        description: 'New app name'
+        required: true
+        default: 'SI TV'
+        type: string
+      panel_url_value:
+        description: 'Panel URL value (replaces "dynam" in URLs)'
+        required: true
+        default: 'sitv'
+        type: string
+
+jobs:
+  modify-apk:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y aapt zipalign
+        
+        echo "Installing apktool..."
+        wget -q https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool
+        wget -q https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar
+        chmod +x apktool
+        sudo mv apktool /usr/local/bin/
+        sudo mv apktool_2.9.3.jar /usr/local/bin/apktool.jar
+        
+        apktool --version
+
+    - name: Generate keystore for signing
+      run: |
+        echo "Generating keystore for APK signing..."
+        keytool -genkey -v -keystore release-key.keystore -alias alias_name \
+          -keyalg RSA -keysize 2048 -validity 10000 \
+          -storepass password -keypass password \
+          -dname "CN=GitHub Action, OU=CI, O=GitHub, L=GitHub, S=GitHub, C=US"
+        
+        echo "Keystore generated successfully"
+
+    - name: Verify APK file exists
+      run: |
+        echo "Checking for APK file..."
+        if [ ! -f "apk/${{ github.event.inputs.apk_file }}" ]; then
+          echo "ERROR: APK file apk/${{ github.event.inputs.apk_file }} not found"
+          echo "Available files in apk/ directory:"
+          ls -la apk/ || echo "apk/ directory not found"
+          exit 1
+        fi
+        echo "Found APK file: apk/${{ github.event.inputs.apk_file }}"
+        ls -lh "apk/${{ github.event.inputs.apk_file }}"
+
+    - name: Decompile APK - Optimized
+      run: |
+        echo "Decompiling APK with optimized settings..."
+        
+        # Try decompilation with best compatibility
+        if ! apktool d "apk/${{ github.event.inputs.apk_file }}" -o decompiled_apk --force; then
+          echo "Standard decompilation failed, trying with --only-main-classes..."
+          if ! apktool d "apk/${{ github.event.inputs.apk_file }}" -o decompiled_apk --force --only-main-classes; then
+            echo "Trying with --no-debug-info..."
+            apktool d "apk/${{ github.event.inputs.apk_file }}" -o decompiled_apk --force --no-debug-info
+          fi
+        fi
+        
+        if [ ! -d "decompiled_apk" ]; then
+          echo "ERROR: APK decompilation failed"
+          exit 1
+        fi
+        
+        echo "✅ APK decompiled successfully"
+        SMALI_COUNT=$(find decompiled_apk -name "*.smali" | wc -l)
+        echo "📊 Smali files generated: $SMALI_COUNT"
+
+    - name: 🧹 AGGRESSIVE DUPLICATE CLEANUP
+      run: |
+        echo "🧹 AGGRESSIVE DUPLICATE CLEANUP"
+        echo "============================================================"
+        
+        cd decompiled_apk
+        
+        # Step 1: Remove problematic Facebook Ads SDK files completely
+        echo "🔥 Removing Facebook Ads SDK conflicts..."
+        
+        # List of problematic Facebook paths to remove entirely
+        FB_PATHS=(
+          "*/com/facebook/ads/internal/checkerframework"
+          "*/com/facebook/ads/internal/annotations"
+          "*/com/facebook/ads/internal/util/process"
+          "*/com/facebook/ads/internal/util/common"
+        )
+        
+        for pattern in "${FB_PATHS[@]}"; do
+          echo "  Removing: $pattern"
+          find . -path "$pattern" -type d -exec rm -rf {} + 2>/dev/null || true
+        done
+        
+        # Step 2: Remove duplicate classes across all smali directories
+        echo "🔄 Removing cross-directory duplicates..."
+        
+        # Find all smali directories
+        SMALI_DIRS=($(find . -maxdepth 1 -name "smali*" -type d | sort))
+        echo "Found smali directories: ${SMALI_DIRS[*]}"
+        
+        # Keep only classes in the first smali directory, remove from others
+        if [ ${#SMALI_DIRS[@]} -gt 1 ]; then
+          PRIMARY_DIR="${SMALI_DIRS[0]}"
+          echo "Primary directory: $PRIMARY_DIR"
+          
+          for ((i=1; i<${#SMALI_DIRS[@]}; i++)); do
+            SECONDARY_DIR="${SMALI_DIRS[i]}"
+            echo "Checking for duplicates in: $SECONDARY_DIR"
+            
+            # Find classes that exist in both directories
+            find "$PRIMARY_DIR" -name "*.smali" -type f | while read -r primary_file; do
+              # Convert primary path to secondary path
+              relative_path="${primary_file#$PRIMARY_DIR/}"
+              secondary_file="$SECONDARY_DIR/$relative_path"
+              
+              if [ -f "$secondary_file" ]; then
+                echo "    Removing duplicate: $secondary_file"
+                rm -f "$secondary_file"
+                
+                # Remove empty parent directories
+                parent_dir=$(dirname "$secondary_file")
+                while [ "$parent_dir" != "$SECONDARY_DIR" ] && [ -d "$parent_dir" ]; do
+                  if [ -z "$(ls -A "$parent_dir" 2>/dev/null)" ]; then
+                    rmdir "$parent_dir" 2>/dev/null || break
+                    parent_dir=$(dirname "$parent_dir")
+                  else
+                    break
+                  fi
+                done
+              fi
+            done
+          done
+        fi
+        
+        # Step 3: Clean up other problematic files
+        echo "🧽 Cleaning other problematic files..."
+        find . -name "*.orig" -delete
+        find . -name "*.rej" -delete
+        find . -name "*~" -delete
+        
+        # Step 4: Verify cleanup
+        echo "✅ Cleanup verification:"
+        REMAINING_FB=$(find . -path "*/com/facebook/ads/internal/checkerframework" -type d | wc -l)
+        echo "  Remaining problematic Facebook dirs: $REMAINING_FB"
+        
+        TOTAL_SMALI_AFTER=$(find . -name "*.smali" | wc -l)
+        echo "  Total smali files after cleanup: $TOTAL_SMALI_AFTER"
+        
+        cd ..
+        echo "🧹 AGGRESSIVE CLEANUP COMPLETE"
+
+    - name: 🎯 OPTIMIZED URL REPLACEMENT
+      run: |
+        NEW_PANEL_VALUE="${{ github.event.inputs.panel_url_value }}"
+        
+        echo "🎯 OPTIMIZED URL REPLACEMENT"
+        echo "============================================================"
+        echo "Target: dynam → $NEW_PANEL_VALUE"
+        
+        OLD_URL1="https://rebrandking.com/panels/SM4trio/dynam/"
+        OLD_URL2="https://rebrandking.com/panels/SM4trio/dynam/api/"
+        NEW_URL1="https://rebrandking.com/panels/SM4trio/$NEW_PANEL_VALUE/"
+        NEW_URL2="https://rebrandking.com/panels/SM4trio/$NEW_PANEL_VALUE/api/"
+        
+        echo "URLs to replace:"
+        echo "  $OLD_URL1 → $NEW_URL1"
+        echo "  $OLD_URL2 → $NEW_URL2"
+        
+        # Quick scan for rebrandking files first
+        echo "🔍 Quick scan for rebrandking URLs..."
+        REBRAND_FILES=$(find decompiled_apk -name "*.smali" -exec grep -l "rebrandking.com" {} \; 2>/dev/null || true)
+        
+        if [ -z "$REBRAND_FILES" ]; then
+          echo "❌ No rebrandking URLs found in APK"
+          echo "ℹ️  Skipping URL replacement step"
+        else
+          echo "✅ Found rebrandking URLs in files:"
+          echo "$REBRAND_FILES" | head -5
+          echo ""
+          
+          TOTAL_REPLACED=0
+          
+          # Process only files that contain rebrandking URLs
+          echo "$REBRAND_FILES" | while IFS= read -r file; do
+            if [ -f "$file" ]; then
+              echo "📁 Processing: $file"
+              
+              # Count and replace URLs
+              URL1_COUNT=$(grep -c "$OLD_URL1" "$file" 2>/dev/null) || URL1_COUNT=0
+              URL2_COUNT=$(grep -c "$OLD_URL2" "$file" 2>/dev/null) || URL2_COUNT=0
+              
+              if [ "$URL1_COUNT" -gt 0 ] || [ "$URL2_COUNT" -gt 0 ]; then
+                echo "  Found: $URL1_COUNT URL1, $URL2_COUNT URL2"
+                
+                # Perform replacements
+                sed -i "s|$OLD_URL1|$NEW_URL1|g" "$file"
+                sed -i "s|$OLD_URL2|$NEW_URL2|g" "$file"
+                
+                # Verify
+                NEW_COUNT=$(grep -c "rebrandking.com/panels/SM4trio/$NEW_PANEL_VALUE" "$file" 2>/dev/null) || NEW_COUNT=0
+                echo "  ✅ Replaced with $NEW_COUNT new URLs"
+                
+                TOTAL_REPLACED=$((TOTAL_REPLACED + URL1_COUNT + URL2_COUNT))
+              fi
+            fi
+          done
+          
+          echo ""
+          echo "📊 URL Replacement Summary:"
+          echo "Total URLs processed: $TOTAL_REPLACED"
+          
+          # Final verification
+          FINAL_OLD=$(find decompiled_apk -name "*.smali" -exec grep -c "rebrandking.com/panels/SM4trio/dynam" {} \; 2>/dev/null | awk '{sum += $1} END {print sum+0}') || FINAL_OLD=0
+          FINAL_NEW=$(find decompiled_apk -name "*.smali" -exec grep -c "rebrandking.com/panels/SM4trio/$NEW_PANEL_VALUE" {} \; 2>/dev/null | awk '{sum += $1} END {print sum+0}') || FINAL_NEW=0
+          
+          echo "Remaining old URLs: $FINAL_OLD"
+          echo "New URLs created: $FINAL_NEW"
+          
+          if [ "$FINAL_OLD" -eq 0 ] && [ "$FINAL_NEW" -gt 0 ]; then
+            echo "🎉 SUCCESS: All URLs replaced!"
+          elif [ "$FINAL_NEW" -gt 0 ]; then
+            echo "✅ PARTIAL SUCCESS: $FINAL_NEW URLs replaced"
+          fi
+        fi
+        
+        echo "🎯 OPTIMIZED URL REPLACEMENT COMPLETE"
+
+    - name: Package and App Name Updates
+      run: |
+        echo "📦 Updating package and app names..."
+        
+        OLD_PACKAGE="com.dynamic.tv"
+        NEW_PACKAGE="${{ github.event.inputs.new_package_name }}"
+        OLD_APP_NAME="Dynamic TV"
+        NEW_APP_NAME="${{ github.event.inputs.new_app_name }}"
+        
+        echo "Package: $OLD_PACKAGE → $NEW_PACKAGE"
+        echo "App Name: $OLD_APP_NAME → $NEW_APP_NAME"
+        
+        # Only process necessary files for speed
+        echo "🔄 Processing smali files..."
+        find decompiled_apk -name "*.smali" -type f -exec sed -i "s|L$OLD_PACKAGE|L$NEW_PACKAGE|g" {} \;
+        find decompiled_apk -name "*.smali" -type f -exec sed -i "s|\"$OLD_PACKAGE\"|\"$NEW_PACKAGE\"|g" {} \;
+        find decompiled_apk -name "*.smali" -type f -exec sed -i "s|\"$OLD_APP_NAME\"|\"$NEW_APP_NAME\"|g" {} \;
+        
+        echo "🔄 Processing XML files..."
+        if [ -f "decompiled_apk/AndroidManifest.xml" ]; then
+          sed -i "s|$OLD_PACKAGE|$NEW_PACKAGE|g" decompiled_apk/AndroidManifest.xml
+          sed -i "s|$OLD_APP_NAME|$NEW_APP_NAME|g" decompiled_apk/AndroidManifest.xml
+        fi
+        
+        find decompiled_apk -name "strings.xml" -type f -exec sed -i "s|$OLD_APP_NAME|$NEW_APP_NAME|g" {} \;
+        
+        echo "✅ Package and app name updates complete"
+
+    - name: Replace Images - Fast
+      run: |
+        echo "🖼️ Fast image replacement..."
+        
+        if [ ! -d "images-to-replace" ]; then
+          echo "⚠️ images-to-replace directory not found, skipping image replacement"
+        else
+          echo "Available images: $(ls images-to-replace/ | wc -l)"
+          
+          # Process only existing images for speed
+          for image_file in images-to-replace/*; do
+            if [ -f "$image_file" ]; then
+              image_name=$(basename "$image_file")
+              
+              # Find and replace matching images
+              targets=$(find decompiled_apk -name "$image_name" -type f)
+              if [ -n "$targets" ]; then
+                echo "Replacing: $image_name"
+                echo "$targets" | while read -r target; do
+                  cp "$image_file" "$target"
+                done
+              fi
+            fi
+          done
+          
+          echo "✅ Image replacement complete"
+        fi
+
+    - name: 🔧 OPTIMIZED RECOMPILATION PREP
+      run: |
+        echo "🔧 OPTIMIZED RECOMPILATION PREP"
+        echo "============================================================"
+        
+        cd decompiled_apk
+        
+        # Fix apktool.yml for better compatibility
+        if [ -f "apktool.yml" ]; then
+          echo "Optimizing apktool.yml..."
+          
+          # Backup original
+          cp apktool.yml apktool.yml.bak
+          
+          # Create optimized configuration
+          cat > apktool.yml << EOF
+version: "2.9.3"
+apkFileName: ${{ github.event.inputs.apk_file }}
+isFrameworkApk: false
+usesFramework:
+  ids:
+  - 1
+sdkInfo:
+packageInfo:
+compressionType: false
+doNotCompress:
+- resources.arsc
+- META-INF/services/javax.annotation.processing.Processor
+EOF
+        fi
+        
+        # Clean META-INF more thoroughly
+        if [ -d "original/META-INF" ]; then
+          echo "Cleaning META-INF thoroughly..."
+          find original/META-INF -name "*.RSA" -delete
+          find original/META-INF -name "*.SF" -delete
+          find original/META-INF -name "MANIFEST.MF" -delete
+          find original/META-INF -name "*.DSA" -delete
+        fi
+        
+        # Remove any remaining problematic files
+        find . -name "*.kotlin_*" -delete 2>/dev/null || true
+        find . -name "*.backup" -delete 2>/dev/null || true
+        
+        cd ..
+        echo "✅ Recompilation prep complete"
+
+    - name: 🏗️ SMART RECOMPILATION
+      run: |
+        echo "🏗️ SMART RECOMPILATION"
+        echo "============================================================"
+        
+        # Try multiple recompilation strategies with increasing aggressiveness
+        RECOMPILE_SUCCESS=false
+        
+        echo "Strategy 1: Standard AAPT2 compilation..."
+        if apktool b decompiled_apk -o modified_unsigned.apk --use-aapt2; then
+          echo "✅ AAPT2 compilation successful"
+          RECOMPILE_SUCCESS=true
+        else
+          echo "❌ AAPT2 failed, trying AAPT1..."
+          
+          if apktool b decompiled_apk -o modified_unsigned.apk; then
+            echo "✅ AAPT1 compilation successful"
+            RECOMPILE_SUCCESS=true
+          else
+            echo "❌ AAPT1 failed, trying no-crunch..."
+            
+            if apktool b decompiled_apk -o modified_unsigned.apk --no-crunch; then
+              echo "✅ No-crunch compilation successful"
+              RECOMPILE_SUCCESS=true
+            else
+              echo "❌ All standard methods failed, trying aggressive cleanup..."
+              
+              # Aggressive cleanup and retry
+              cd decompiled_apk
+              
+              # Remove ALL Facebook Ads SDK completely
+              find . -path "*/com/facebook/ads" -type d -exec rm -rf {} + 2>/dev/null || true
+              
+              # Remove other problematic libraries
+              find . -path "*/androidx/annotation" -type d -exec rm -rf {} + 2>/dev/null || true
+              find . -path "*/kotlin" -type d -exec rm -rf {} + 2>/dev/null || true
+              
+              cd ..
+              
+              echo "Trying compilation after aggressive cleanup..."
+              if apktool b decompiled_apk -o modified_unsigned.apk --no-crunch; then
+                echo "✅ Post-cleanup compilation successful"
+                RECOMPILE_SUCCESS=true
+              fi
+            fi
+          fi
+        fi
+        
+        if [ "$RECOMPILE_SUCCESS" = false ]; then
+          echo "❌ ERROR: All recompilation strategies failed"
+          echo "Checking decompiled structure for debugging..."
+          ls -la decompiled_apk/
+          exit 1
+        fi
+        
+        echo "✅ APK recompilation successful"
+        ls -lh modified_unsigned.apk
+
+    - name: ✍️ Sign and Align APK
+      run: |
+        echo "✍️ Signing and aligning APK..."
+        
+        # Sign APK
+        jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 \
+          -keystore release-key.keystore -storepass password \
+          modified_unsigned.apk alias_name
+        
+        # Align APK
+        zipalign -v 4 modified_unsigned.apk modified_signed_aligned.apk
+        
+        echo "✅ APK signed and aligned successfully"
+        ls -lh modified_signed_aligned.apk
+
+    - name: 📤 Package Results
+      run: |
+        echo "📤 Packaging results..."
+        mkdir -p output
+        cp modified_signed_aligned.apk output/
+        cp modified_unsigned.apk output/
+        
+        # Create summary
+        cat > output/modification_summary.txt << EOF
+APK Modification Summary - Optimized Workflow
+============================================
+Original APK: ${{ github.event.inputs.apk_file }}
+Modified APK: modified_signed_aligned.apk
+
+Optimizations Applied:
+- Aggressive Facebook Ads SDK conflict cleanup
+- Targeted URL replacement (rebrandking URLs only)
+- Fast image processing (existing files only)
+- Smart recompilation with multiple fallback strategies
+
+Changes Made:
+- Package Name: com.dynamic.tv → ${{ github.event.inputs.new_package_name }}
+- App Name: Dynamic TV → ${{ github.event.inputs.new_app_name }}
+- Panel URLs: dynam → ${{ github.event.inputs.panel_url_value }}
+- Images: Replaced available assets
+- Conflicts: Removed problematic duplicate classes
+
+Generated: $(date)
+Workflow: Optimized APK Modifier
+EOF
+        
+        echo "Files ready in output/ directory:"
+        ls -la output/
+
+    - name: 📤 Upload Results
+      uses: actions/upload-artifact@v4
+      with:
+        name: optimized-apk-${{ github.run_number }}
+        path: output/
+        retention-days: 30
+
+    - name: ✅ Success Summary
+      run: |
+        echo "## ✅ Optimized APK Modification Complete! 🚀" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🎯 Optimizations Applied:" >> $GITHUB_STEP_SUMMARY
+        echo "- **Aggressive Cleanup**: Removed Facebook Ads SDK conflicts" >> $GITHUB_STEP_SUMMARY
+        echo "- **Targeted Processing**: Only processed files with rebrandking URLs" >> $GITHUB_STEP_SUMMARY
+        echo "- **Fast Image Replacement**: Processed only existing images" >> $GITHUB_STEP_SUMMARY
+        echo "- **Smart Recompilation**: Multiple fallback strategies" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📋 Changes Made:" >> $GITHUB_STEP_SUMMARY
+        echo "- **Package**: com.dynamic.tv → ${{ github.event.inputs.new_package_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **App Name**: Dynamic TV → ${{ github.event.inputs.new_app_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Panel URLs**: dynam → ${{ github.event.inputs.panel_url_value }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Images**: Replaced available assets" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📥 Download:" >> $GITHUB_STEP_SUMMARY
+        echo "**optimized-apk-${{ github.run_number }}** - Ready for installation!" >> $GITHUB_STEP_SUMMARY
