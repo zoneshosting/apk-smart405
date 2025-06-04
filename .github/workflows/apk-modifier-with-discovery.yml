@@ -55,9 +55,9 @@ jobs:
       run: |
         echo "🔓 Starting APK decompilation..."
         
-        # Multi-fallback decompilation strategy
-        if apktool d "apk/${{ github.event.inputs.apk_file }}" -o decoded --no-src; then
-          echo "✅ Decompilation successful with --no-src"
+        # Multi-fallback decompilation strategy - REMOVED --no-src to get smali files
+        if apktool d "apk/${{ github.event.inputs.apk_file }}" -o decoded; then
+          echo "✅ Decompilation successful (full decompilation)"
         elif apktool d "apk/${{ github.event.inputs.apk_file }}" -o decoded --only-main-classes; then
           echo "✅ Decompilation successful with --only-main-classes"
         elif apktool d "apk/${{ github.event.inputs.apk_file }}" -o decoded --no-debug-info; then
@@ -69,6 +69,10 @@ jobs:
         
         echo "📁 Decompiled structure:"
         ls -la decoded/
+        echo "📁 Checking for smali directories:"
+        ls -la decoded/ | grep smali || echo "⚠️ No smali directories found"
+        echo "📊 Smali file count:"
+        find decoded -name "*.smali" | wc -l
 
     - name: 🔍 COMPREHENSIVE URL DISCOVERY
       run: |
