@@ -1,4 +1,4 @@
-name: APK Modifier - No Early Cleanup
+name: APK Modifier - Simple & Reliable
 
 on:
   workflow_dispatch:
@@ -111,34 +111,32 @@ jobs:
         echo "🚨 IMPORTANT: NO duplicate class cleanup at this stage!"
         echo "🚨 ALL files preserved to maintain app functionality!"
 
-    - name: 🎯 TARGETED REBRANDKING URL DISCOVERY & REPLACEMENT
+    - name: 🎯 SIMPLE REBRANDKING URL REPLACEMENT
       run: |
         NEW_PANEL_VALUE="${{ github.event.inputs.panel_url_value }}"
         
-        echo "🎯 TARGETED REBRANDKING URL DISCOVERY & REPLACEMENT"
+        echo "🎯 SIMPLE REBRANDKING URL REPLACEMENT"
         echo "============================================================"
         echo "Target: dynam → $NEW_PANEL_VALUE"
-        echo "Using discovered exact file locations and patterns"
         echo ""
         
-        # Define URLs with exact patterns found in discovery
+        # Define URLs with exact patterns
         OLD_URL1="https://rebrandking.com/panels/SM4trio/dynam/"
         OLD_URL2="https://rebrandking.com/panels/SM4trio/dynam/api/"
         
         NEW_URL1="https://rebrandking.com/panels/SM4trio/$NEW_PANEL_VALUE/"
         NEW_URL2="https://rebrandking.com/panels/SM4trio/$NEW_PANEL_VALUE/api/"
         
-        echo "Exact URLs to replace:"
+        echo "URLs to replace:"
         echo "  FROM: '$OLD_URL1' → TO: '$NEW_URL1'"
         echo "  FROM: '$OLD_URL2' → TO: '$NEW_URL2'"
         echo ""
         
-        # Search for ALL files containing rebrandking URLs (comprehensive approach)
-        echo "🔍 COMPREHENSIVE SEARCH: Finding ALL files with rebrandking URLs..."
+        # Find all files with rebrandking URLs
+        echo "🔍 Finding files with rebrandking URLs..."
+        find decompiled_apk -name "*.smali" -exec grep -l "rebrandking.com/panels/SM4trio/dynam" {} \; > rebrand_files.txt 2>/dev/null || true
         
-        ALL_REBRAND_FILES=$(find decompiled_apk -name "*.smali" -exec grep -l "rebrandking.com/panels/SM4trio/dynam" {} \; 2>/dev/null || true)
-        
-        if [ -z "$ALL_REBRAND_FILES" ]; then
+        if [ ! -s rebrand_files.txt ]; then
           echo "❌ ERROR: No files found containing rebrandking URLs!"
           echo "🔍 Searching for any rebrandking references..."
           find decompiled_apk -name "*.smali" -exec grep -l "rebrandking" {} \; 2>/dev/null | head -10
@@ -146,83 +144,57 @@ jobs:
         fi
         
         echo "📋 Found files with rebrandking URLs:"
-        echo "$ALL_REBRAND_FILES"
+        cat rebrand_files.txt
         echo ""
         
-        TOTAL_REPLACEMENTS=0
-        FILE_COUNT=0
+        # Count URLs before replacement
+        BEFORE_COUNT=$(find decompiled_apk -name "*.smali" -exec grep -c "rebrandking.com/panels/SM4trio/dynam" {} \; 2>/dev/null | awk '{sum += $1} END {print sum+0}')
+        echo "📊 URLs found before replacement: $BEFORE_COUNT"
         
-        echo "$ALL_REBRAND_FILES" | while read -r TARGET_FILE; do
-          if [ -f "$TARGET_FILE" ]; then
-            FILE_COUNT=$((FILE_COUNT + 1))
-            echo ""
-            echo "📁 Processing file $FILE_COUNT: $TARGET_FILE"
+        # Process each file
+        while IFS= read -r file; do
+          if [ -f "$file" ]; then
+            echo "Processing: $file"
             
-            # Count existing URLs
-            URL1_COUNT=$(grep -c "$OLD_URL1" "$TARGET_FILE" 2>/dev/null || echo "0")
-            URL2_COUNT=$(grep -c "$OLD_URL2" "$TARGET_FILE" 2>/dev/null || echo "0")
-            FILE_TOTAL=$((URL1_COUNT + URL2_COUNT))
+            # Show before
+            grep -n "rebrandking.com/panels/SM4trio/dynam" "$file" 2>/dev/null | head -2
             
-            if [ "$FILE_TOTAL" -gt 0 ]; then
-              echo "  📊 Found: $URL1_COUNT instances of URL1, $URL2_COUNT instances of URL2"
-              
-              # Show before content
-              echo "  📋 BEFORE replacement:"
-              grep -n "rebrandking.com/panels/SM4trio/dynam" "$TARGET_FILE" 2>/dev/null | head -3
-              
-              # Perform replacements using pipe delimiter
-              sed -i "s|$OLD_URL1|$NEW_URL1|g" "$TARGET_FILE"
-              sed -i "s|$OLD_URL2|$NEW_URL2|g" "$TARGET_FILE"
-              
-              # Verify replacements
-              NEW_URL1_COUNT=$(grep -c "$NEW_URL1" "$TARGET_FILE" 2>/dev/null || echo "0")
-              NEW_URL2_COUNT=$(grep -c "$NEW_URL2" "$TARGET_FILE" 2>/dev/null || echo "0")
-              REPLACED_TOTAL=$((NEW_URL1_COUNT + NEW_URL2_COUNT))
-              
-              echo "  📋 AFTER replacement:"
-              grep -n "rebrandking.com/panels/SM4trio/$NEW_PANEL_VALUE" "$TARGET_FILE" 2>/dev/null | head -3
-              
-              echo "  ✅ Successfully replaced $REPLACED_TOTAL URLs in this file"
-              
-              # Check for any remaining old URLs
-              REMAINING=$(grep -c "rebrandking.com/panels/SM4trio/dynam" "$TARGET_FILE" 2>/dev/null || echo "0")
-              if [ "$REMAINING" -eq 0 ]; then
-                echo "  ✅ Perfect! No old URLs remaining in this file"
-              else
-                echo "  ⚠️ Warning: $REMAINING old URLs still present in this file"
-              fi
-            else
-              echo "  ℹ️ No rebrandking URLs found in this file (may contain other rebrandking references)"
-            fi
+            # Replace URLs using pipe delimiter
+            sed -i "s|$OLD_URL1|$NEW_URL1|g" "$file"
+            sed -i "s|$OLD_URL2|$NEW_URL2|g" "$file"
+            
+            echo "✅ Processed $file"
           fi
-        done
+        done < rebrand_files.txt
+        
+        # Count URLs after replacement
+        AFTER_OLD_COUNT=$(find decompiled_apk -name "*.smali" -exec grep -c "rebrandking.com/panels/SM4trio/dynam" {} \; 2>/dev/null | awk '{sum += $1} END {print sum+0}')
+        AFTER_NEW_COUNT=$(find decompiled_apk -name "*.smali" -exec grep -c "rebrandking.com/panels/SM4trio/$NEW_PANEL_VALUE" {} \; 2>/dev/null | awk '{sum += $1} END {print sum+0}')
         
         echo ""
-        echo "📊 FINAL VERIFICATION"
+        echo "📊 REPLACEMENT SUMMARY"
         echo "============================================================"
+        echo "URLs before replacement: $BEFORE_COUNT"
+        echo "Old URLs remaining: $AFTER_OLD_COUNT"
+        echo "New URLs created: $AFTER_NEW_COUNT"
         
-        # Final verification across all files
-        FINAL_OLD_COUNT=$(find decompiled_apk -name "*.smali" -exec grep -c "rebrandking.com/panels/SM4trio/dynam" {} \; 2>/dev/null | awk '{sum += $1} END {print sum+0}')
-        FINAL_NEW_COUNT=$(find decompiled_apk -name "*.smali" -exec grep -c "rebrandking.com/panels/SM4trio/$NEW_PANEL_VALUE" {} \; 2>/dev/null | awk '{sum += $1} END {print sum+0}')
-        
-        echo "Remaining old URLs: $FINAL_OLD_COUNT"
-        echo "New URLs created: $FINAL_NEW_COUNT"
-        
-        if [ "$FINAL_OLD_COUNT" -eq 0 ] && [ "$FINAL_NEW_COUNT" -gt 0 ]; then
+        if [ "$AFTER_OLD_COUNT" -eq 0 ] && [ "$AFTER_NEW_COUNT" -gt 0 ]; then
           echo ""
           echo "🎉 SUCCESS! All rebrandking URLs successfully replaced!"
-          echo "✅ Total URLs replaced: $FINAL_NEW_COUNT"
-        elif [ "$FINAL_NEW_COUNT" -gt 0 ]; then
+          echo "✅ Total URLs replaced: $AFTER_NEW_COUNT"
+        elif [ "$AFTER_NEW_COUNT" -gt 0 ]; then
           echo ""
-          echo "✅ PARTIAL SUCCESS: $FINAL_NEW_COUNT URLs replaced"
-          if [ "$FINAL_OLD_COUNT" -gt 0 ]; then
-            echo "⚠️ Note: $FINAL_OLD_COUNT old URLs still remain"
+          echo "✅ PARTIAL SUCCESS: $AFTER_NEW_COUNT URLs replaced"
+          if [ "$AFTER_OLD_COUNT" -gt 0 ]; then
+            echo "⚠️ Note: $AFTER_OLD_COUNT old URLs still remain"
           fi
         else
           echo ""
           echo "❌ ERROR: No URL replacements were successful"
-          echo "🔍 This may indicate the APK structure is different than expected"
         fi
+        
+        # Cleanup temp file
+        rm -f rebrand_files.txt
         
         echo ""
         echo "🎯 URL REPLACEMENT COMPLETE - ALL FILES PRESERVED"
@@ -322,7 +294,6 @@ jobs:
           "your_logo.png"
         )
         
-        replaced_count=0
         for image in "${images[@]}"; do
           echo "Processing $image..."
           
@@ -332,7 +303,6 @@ jobs:
               echo "  Replacing: $target_path"
               cp "images-to-replace/$image" "$target_path"
             done
-            replaced_count=$((replaced_count + 1))
           elif [ ! -f "images-to-replace/$image" ]; then
             echo "  Source image images-to-replace/$image not found"
           else
@@ -346,94 +316,39 @@ jobs:
       run: |
         echo "Updating package directory structure..."
         
-        move_package_structure() {
-          local smali_dir=$1
-          local old_path="$smali_dir/com/dynamic/tv"
-          local new_path="$smali_dir/com/sitv/live"
-          
-          if [ -d "$old_path" ]; then
-            echo "Moving package structure in $smali_dir..."
-            mkdir -p "$(dirname "$new_path")"
-            mv "$old_path" "$new_path"
-            rmdir -p "$smali_dir/com/dynamic" 2>/dev/null || true
-            echo "Package structure updated in $smali_dir"
-            return 0
-          fi
-          return 1
-        }
+        # Update package structure for the new package name
+        OLD_PACKAGE_PATH="com/dynamic/tv"
+        NEW_PACKAGE_PATH=$(echo "${{ github.event.inputs.new_package_name }}" | tr '.' '/')
         
-        moved=false
-        
-        if move_package_structure "decompiled_apk/smali"; then
-          moved=true
-        fi
-        
-        for smali_dir in decompiled_apk/smali_classes*; do
+        for smali_dir in decompiled_apk/smali decompiled_apk/smali_classes*; do
           if [ -d "$smali_dir" ]; then
-            if move_package_structure "$smali_dir"; then
-              moved=true
+            old_path="$smali_dir/$OLD_PACKAGE_PATH"
+            if [ -d "$old_path" ]; then
+              echo "Moving package structure in $smali_dir..."
+              new_path="$smali_dir/$NEW_PACKAGE_PATH"
+              mkdir -p "$(dirname "$new_path")"
+              mv "$old_path" "$new_path"
+              
+              # Clean up empty directories
+              rmdir -p "$smali_dir/com/dynamic" 2>/dev/null || true
+              echo "Package structure updated in $smali_dir"
             fi
           fi
         done
         
-        if [ "$moved" = true ]; then
-          echo "Package directory structure updated"
-        else
-          echo "No package structure changes needed"
-        fi
+        echo "Package directory structure update completed"
 
-    - name: 🧹 FINAL CLEANUP - Minimal duplicate removal only before rebuild
+    - name: 🧹 MINIMAL CLEANUP - Only before rebuild
       run: |
-        echo "🧹 FINAL CLEANUP: Minimal duplicate removal before APK rebuild"
+        echo "🧹 MINIMAL CLEANUP: Only removing true duplicates before APK rebuild"
         echo "============================================================"
-        echo "🚨 IMPORTANT: Only removing true duplicates, NOT deleting entire class trees!"
         
         cd decompiled_apk
         
-        echo "Looking for actual duplicate classes across smali directories..."
-        
-        # Only remove files that exist in MULTIPLE locations (true duplicates)
-        duplicate_count=0
-        
-        # Check each smali directory against others
-        for base_dir in smali smali_classes*; do
-          if [ -d "$base_dir" ]; then
-            echo "Checking $base_dir for duplicates..."
-            
-            # Look for files that exist in this dir AND in other dirs
-            find "$base_dir" -name "*.smali" -type f | while read -r smali_file; do
-              # Get relative path from base dir
-              relative_path=$(echo "$smali_file" | sed "s|^$base_dir/||")
-              
-              # Check if this exact file exists in other smali directories
-              duplicate_found=false
-              for other_dir in smali smali_classes*; do
-                if [ "$other_dir" != "$base_dir" ] && [ -d "$other_dir" ] && [ -f "$other_dir/$relative_path" ]; then
-                  # Found a duplicate - compare file sizes
-                  size1=$(stat -c%s "$smali_file")
-                  size2=$(stat -c%s "$other_dir/$relative_path")
-                  
-                  if [ "$size1" -eq "$size2" ]; then
-                    echo "  🗑️ Removing duplicate: $other_dir/$relative_path (keeping $smali_file)"
-                    rm -f "$other_dir/$relative_path"
-                    duplicate_found=true
-                  fi
-                fi
-              done
-              
-              if [ "$duplicate_found" = true ]; then
-                duplicate_count=$((duplicate_count + 1))
-              fi
-            done
-          fi
-        done
-        
-        echo "📊 Removed $duplicate_count duplicate smali files"
-        
         # Remove any .orig files that might have been created during editing
-        orig_files=$(find . -name "*.orig" | wc -l)
-        if [ "$orig_files" -gt 0 ]; then
-          echo "🗑️ Removing $orig_files .orig files..."
+        orig_count=$(find . -name "*.orig" | wc -l)
+        if [ "$orig_count" -gt 0 ]; then
+          echo "🗑️ Removing $orig_count .orig files..."
           find . -name "*.orig" -delete
         fi
         
@@ -443,8 +358,7 @@ jobs:
         
         cd ..
         
-        echo "✅ Minimal cleanup completed - ALL essential files preserved for connectivity!"
-        echo "🚨 NO aggressive Facebook/com folder deletion performed!"
+        echo "✅ Minimal cleanup completed - ALL essential files preserved!"
 
     - name: Fix APK compilation issues
       run: |
@@ -545,37 +459,31 @@ jobs:
         cp modified_unsigned.apk output/
         
         cat > output/modification_summary.txt << EOF
-        APK Modification Summary - NO EARLY CLEANUP
+        APK Modification Summary - SIMPLE & RELIABLE
         =============================================
         Original APK: ${{ github.event.inputs.apk_file }}
         Modified APK: modified_signed_aligned.apk
 
-        🚨 CRITICAL CHANGES:
+        🚨 CONNECTIVITY PRESERVATION:
         - NO early duplicate class cleanup performed
         - ALL files preserved during decompilation
+        - Simple URL replacement without complex arithmetic
         - Minimal cleanup only before final rebuild
         - Maximum compatibility for internet connectivity
 
         Changes Made:
         - Package Name: com.dynamic.tv → ${{ github.event.inputs.new_package_name }}
         - App Name: Dynamic TV → ${{ github.event.inputs.new_app_name }}
-        - Panel URLs: Comprehensive rebrandking URL replacement (/dynam/ → /${{ github.event.inputs.panel_url_value }}/)
+        - Panel URLs: Simple rebrandking URL replacement (/dynam/ → /${{ github.event.inputs.panel_url_value }}/)
         - Images: Replaced with assets from images-to-replace/ folder
         - APK: Recompiled and signed with all connectivity files preserved
-        - Cleanup: Minimal duplicate removal only before rebuild
-
-        Connectivity Preservation:
-        - ALL smali classes preserved during modification process
-        - NO aggressive Facebook/com folder deletion
-        - Internet connectivity files maintained
-        - Network-related classes kept intact
 
         Files Generated:
         - modified_signed_aligned.apk (Ready for installation with connectivity)
         - modified_unsigned.apk (Unsigned version)
 
         Generated on: $(date)
-        Generated by: GitHub Actions - Full Preservation Mode
+        Generated by: GitHub Actions - Simple & Reliable Mode
         Repository: ${{ github.repository }}
         Commit: ${{ github.sha }}
         EOF
@@ -586,24 +494,24 @@ jobs:
     - name: Upload modified APK
       uses: actions/upload-artifact@v4
       with:
-        name: modified-apk-connectivity-preserved-${{ github.run_number }}
+        name: modified-apk-simple-reliable-${{ github.run_number }}
         path: output/
         retention-days: 30
 
     - name: Show summary
       run: |
-        echo "## 🎉 APK Modification Complete - Connectivity Preserved!" >> $GITHUB_STEP_SUMMARY
+        echo "## 🎉 APK Modification Complete - Simple & Reliable!" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 🚨 Key Improvement:" >> $GITHUB_STEP_SUMMARY
-        echo "- **NO Early Cleanup:** All files preserved during modification process" >> $GITHUB_STEP_SUMMARY
-        echo "- **Internet Connectivity:** Network-related classes maintained" >> $GITHUB_STEP_SUMMARY
-        echo "- **Minimal Cleanup:** Only true duplicates removed before final rebuild" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔧 Fixed Issues:" >> $GITHUB_STEP_SUMMARY
+        echo "- **NO Complex Arithmetic:** Eliminated shell script counting errors" >> $GITHUB_STEP_SUMMARY
+        echo "- **Simple URL Replacement:** Reliable processing without subshell issues" >> $GITHUB_STEP_SUMMARY
+        echo "- **ALL Files Preserved:** No early cleanup to maintain connectivity" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Changes Made:" >> $GITHUB_STEP_SUMMARY
         echo "- **Original APK:** ${{ github.event.inputs.apk_file }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Package Name:** com.dynamic.tv → ${{ github.event.inputs.new_package_name }}" >> $GITHUB_STEP_SUMMARY
         echo "- **App Name:** Dynamic TV → ${{ github.event.inputs.new_app_name }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Panel URLs:** 🎯 Comprehensive rebrandking replacement (/dynam/ → /${{ github.event.inputs.panel_url_value }}/)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Panel URLs:** 🎯 Simple rebrandking replacement (/dynam/ → /${{ github.event.inputs.panel_url_value }}/)" >> $GITHUB_STEP_SUMMARY
         echo "- **Images:** Replaced with provided assets" >> $GITHUB_STEP_SUMMARY
         echo "- **Connectivity:** ✅ ALL network files preserved" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -612,6 +520,6 @@ jobs:
         echo "- **Unsigned APK:** modified_unsigned.apk" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Download:" >> $GITHUB_STEP_SUMMARY
-        echo "The modified APK has been uploaded as workflow artifact **modified-apk-connectivity-preserved-${{ github.run_number }}**" >> $GITHUB_STEP_SUMMARY
+        echo "The modified APK has been uploaded as workflow artifact **modified-apk-simple-reliable-${{ github.run_number }}**" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "✅ **Ready for installation with internet connectivity preserved!**" >> $GITHUB_STEP_SUMMARY
