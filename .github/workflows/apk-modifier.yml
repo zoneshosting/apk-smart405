@@ -127,171 +127,211 @@ jobs:
         cd ..
         echo "Duplicate class cleanup completed"
 
-    - name: Smart panel URL replacement using smali format
+    - name: Explicit character-exact panel URL replacement
       run: |
         NEW_PANEL_VALUE="${{ github.event.inputs.panel_url_value }}"
         
         echo "============================================================"
-        echo "SMART PANEL URL REPLACEMENT - SMALI FORMAT AWARE"
+        echo "EXPLICIT CHARACTER-EXACT URL REPLACEMENT"
         echo "============================================================"
         echo "Target: dynam → $NEW_PANEL_VALUE"
-        echo "Based on mConfig.smali format analysis"
+        echo "Using exact character matching (forward slashes /dynam/, not \dynam\)"
         echo ""
         
-        # Check if the target file exists (like the example you provided)
-        echo "🔍 Looking for mConfig.smali files..."
-        find decompiled_apk -name "mConfig.smali" -type f 2>/dev/null | while read -r config_file; do
-          echo "Found config file: $config_file"
-          if grep -q "rebrandking.com" "$config_file" 2>/dev/null; then
-            echo "  ✅ Contains rebrandking.com URLs"
-            grep "rebrandking.com" "$config_file"
-          fi
-        done
+        # Define URLs with explicit forward slashes as they appear in smali files
+        URL1="https://rebrandking.com/panels/SM4trio/dynam/"
+        URL2="https://rebrandking.com/panels/SM4trio/dynam/api/"
         
+        # New URLs with replacement value
+        NEW_URL1="https://rebrandking.com/panels/SM4trio/$NEW_PANEL_VALUE/"
+        NEW_URL2="https://rebrandking.com/panels/SM4trio/$NEW_PANEL_VALUE/api/"
+        
+        echo "Exact URLs to find (with forward slashes as stored in smali):"
+        echo "1. '$URL1'"
+        echo "2. '$URL2'"
         echo ""
-        echo "🔍 Smart search for panel URLs in smali format..."
+        echo "Replacement URLs:"
+        echo "1. '$NEW_URL1'"
+        echo "2. '$NEW_URL2'"
+        echo ""
         
-        # Search for the specific smali const-string pattern
-        echo "Looking for const-string patterns with rebrandking.com..."
-        CONST_STRING_FILES=$(find decompiled_apk -name "*.smali" -type f -exec grep -l 'const-string.*rebrandking\.com' {} \; 2>/dev/null)
+        echo "🔍 Character-by-character search in all smali files..."
+        echo ""
         
-        if [ -n "$CONST_STRING_FILES" ]; then
-          echo "Files with const-string rebrandking URLs:"
-          echo "$CONST_STRING_FILES"
+        # Search for URL1 (without /api/) - exact character match
+        echo "Searching for URL1: $URL1"
+        URL1_FILES=$(find decompiled_apk -name "*.smali" -type f -exec grep -l "$URL1" {} \; 2>/dev/null || true)
+        
+        if [ -n "$URL1_FILES" ]; then
+          URL1_COUNT=$(echo "$URL1_FILES" | wc -l)
+          echo "✅ Found URL1 in $URL1_COUNT files:"
+          echo "$URL1_FILES"
           echo ""
-          echo "Content of these files:"
-          echo "$CONST_STRING_FILES" | while read -r file; do
-            echo "--- $file ---"
-            grep -A 1 -B 1 "rebrandking\.com" "$file" 2>/dev/null
-            echo ""
+          echo "Exact content found:"
+          echo "$URL1_FILES" | while read -r file; do
+            if [ -f "$file" ]; then
+              echo "--- $file ---"
+              grep -n "$URL1" "$file" 2>/dev/null || true
+            fi
           done
-        fi
-        
-        echo ""
-        echo "🔍 Alternative search: Looking for quoted rebrandking URLs..."
-        QUOTED_URL_FILES=$(find decompiled_apk -name "*.smali" -type f -exec grep -l '".*rebrandking\.com.*"' {} \; 2>/dev/null)
-        
-        if [ -n "$QUOTED_URL_FILES" ]; then
-          echo "Files with quoted rebrandking URLs:"
-          echo "$QUOTED_URL_FILES"
-          echo ""
-          echo "URL content:"
-          echo "$QUOTED_URL_FILES" | while read -r file; do
-            echo "--- $file ---"
-            grep "rebrandking\.com" "$file" 2>/dev/null
-            echo ""
-          done
-        fi
-        
-        echo ""
-        echo "🔍 Searching specifically for dynam in URLs..."
-        DYNAM_URL_FILES=$(find decompiled_apk -name "*.smali" -type f -exec grep -l 'rebrandking\.com.*dynam' {} \; 2>/dev/null)
-        
-        if [ -n "$DYNAM_URL_FILES" ]; then
-          echo "Files containing rebrandking.com URLs with dynam:"
-          echo "$DYNAM_URL_FILES"
-          echo ""
-          echo "Specific dynam URL content:"
-          echo "$DYNAM_URL_FILES" | while read -r file; do
-            echo "--- $file ---"
-            grep "dynam" "$file" 2>/dev/null
-            echo ""
-          done
-        fi
-        
-        echo ""
-        echo "============================================================"
-        echo "PERFORMING TARGETED REPLACEMENTS"
-        echo "============================================================"
-        
-        # Count URLs before replacement
-        TOTAL_DYNAM_URLS=0
-        
-        # Method 1: Replace in const-string lines
-        echo "Method 1: Replacing in const-string format..."
-        CONST_COUNT=0
-        find decompiled_apk -name "*.smali" -type f -exec grep -l 'rebrandking\.com.*dynam' {} \; 2>/dev/null | while read -r file; do
-          echo "Processing const-string in: $file"
-          # Replace dynam in rebrandking.com URLs
-          sed -i 's|rebrandking\.com/panels/SM4trio/dynam/|rebrandking.com/panels/SM4trio/'$NEW_PANEL_VALUE'/|g' "$file"
-          sed -i 's|rebrandking\.com/panels/SM4trio/dynam|rebrandking.com/panels/SM4trio/'$NEW_PANEL_VALUE'|g' "$file"
-          CONST_COUNT=$((CONST_COUNT + 1))
-        done
-        
-        # Method 2: Replace any occurrence of dynam in rebrandking context
-        echo ""
-        echo "Method 2: Replacing dynam in rebrandking context..."
-        CONTEXT_COUNT=0
-        find decompiled_apk -name "*.smali" -type f -exec grep -l 'rebrandking\.com' {} \; 2>/dev/null | while read -r file; do
-          if grep -q "dynam" "$file" 2>/dev/null; then
-            echo "Processing dynam replacement in: $file"
-            # Replace dynam specifically in rebrandking URLs
-            sed -i 's|SM4trio/dynam/api/|SM4trio/'$NEW_PANEL_VALUE'/api/|g' "$file"
-            sed -i 's|SM4trio/dynam/|SM4trio/'$NEW_PANEL_VALUE'/|g' "$file"
-            sed -i 's|SM4trio/dynam|SM4trio/'$NEW_PANEL_VALUE'|g' "$file"
-            CONTEXT_COUNT=$((CONTEXT_COUNT + 1))
-          fi
-        done
-        
-        # Method 3: Global dynam replacement in files containing rebrandking
-        echo ""
-        echo "Method 3: Global dynam replacement in rebrandking files..."
-        GLOBAL_COUNT=0
-        find decompiled_apk -name "*.smali" -type f -exec grep -l 'rebrandking' {} \; 2>/dev/null | while read -r file; do
-          if grep -q "dynam" "$file" 2>/dev/null; then
-            echo "Global dynam replacement in: $file"
-            sed -i "s|dynam|$NEW_PANEL_VALUE|g" "$file"
-            GLOBAL_COUNT=$((GLOBAL_COUNT + 1))
-          fi
-        done
-        
-        echo ""
-        echo "============================================================"
-        echo "VERIFICATION"
-        echo "============================================================"
-        
-        # Verify replacements
-        echo "🔍 Verifying replacements..."
-        NEW_VALUE_FILES=$(find decompiled_apk -name "*.smali" -type f -exec grep -l "rebrandking.*$NEW_PANEL_VALUE" {} \; 2>/dev/null)
-        
-        if [ -n "$NEW_VALUE_FILES" ]; then
-          echo "✅ Files now containing rebrandking URLs with '$NEW_PANEL_VALUE':"
-          echo "$NEW_VALUE_FILES"
-          echo ""
-          echo "Sample of new URLs:"
-          echo "$NEW_VALUE_FILES" | head -3 | while read -r file; do
-            echo "--- $file ---"
-            grep "rebrandking.*$NEW_PANEL_VALUE" "$file" 2>/dev/null
-            echo ""
-          done
-          
-          # Count total replacements
-          TOTAL_NEW_URLS=$(find decompiled_apk -name "*.smali" -type f -exec grep -c "rebrandking.*$NEW_PANEL_VALUE" {} \; 2>/dev/null | awk '{sum += $1} END {print sum+0}')
-          echo "✅ Total URLs with new value: $TOTAL_NEW_URLS"
-          
-          if [ "$TOTAL_NEW_URLS" -eq 8 ]; then
-            echo "🎯 PERFECT: Exactly 8 URLs replaced as expected!"
-          elif [ "$TOTAL_NEW_URLS" -gt 0 ]; then
-            echo "✅ SUCCESS: $TOTAL_NEW_URLS URLs replaced!"
-          fi
         else
-          echo "❌ No URLs found with new value after replacement"
+          echo "❌ URL1 not found"
+          URL1_COUNT=0
         fi
         
-        # Double-check for any remaining dynam in rebrandking URLs
-        REMAINING_DYNAM=$(find decompiled_apk -name "*.smali" -type f -exec grep -c "rebrandking.*dynam" {} \; 2>/dev/null | awk '{sum += $1} END {print sum+0}')
+        echo ""
         
-        if [ "$REMAINING_DYNAM" -eq 0 ]; then
-          echo "✅ No remaining 'dynam' found in rebrandking URLs"
+        # Search for URL2 (with /api/) - exact character match  
+        echo "Searching for URL2: $URL2"
+        URL2_FILES=$(find decompiled_apk -name "*.smali" -type f -exec grep -l "$URL2" {} \; 2>/dev/null || true)
+        
+        if [ -n "$URL2_FILES" ]; then
+          URL2_COUNT=$(echo "$URL2_FILES" | wc -l)
+          echo "✅ Found URL2 in $URL2_COUNT files:"
+          echo "$URL2_FILES"
+          echo ""
+          echo "Exact content found:"
+          echo "$URL2_FILES" | while read -r file; do
+            if [ -f "$file" ]; then
+              echo "--- $file ---"
+              grep -n "$URL2" "$file" 2>/dev/null || true
+            fi
+          done
         else
-          echo "⚠️  Warning: $REMAINING_DYNAM instances of 'dynam' still found in rebrandking URLs"
-          echo "Remaining dynam instances:"
-          find decompiled_apk -name "*.smali" -type f -exec grep -H "rebrandking.*dynam" {} \; 2>/dev/null | head -5
+          echo "❌ URL2 not found"
+          URL2_COUNT=0
         fi
         
         echo ""
         echo "============================================================"
-        echo "PANEL URL REPLACEMENT COMPLETE"
+        echo "CHARACTER-EXACT REPLACEMENTS"
+        echo "============================================================"
+        
+        TOTAL_REPLACED=0
+        
+        # Replace URL1 with explicit character handling
+        if [ "$URL1_COUNT" -gt 0 ]; then
+          echo "🔄 Replacing URL1 (character-exact)..."
+          echo "  From: '$URL1'"
+          echo "  To:   '$NEW_URL1'"
+          
+          # Use | as delimiter to avoid issues with / characters
+          find decompiled_apk -name "*.smali" -type f -exec sed -i "s|$URL1|$NEW_URL1|g" {} \;
+          TOTAL_REPLACED=$((TOTAL_REPLACED + URL1_COUNT))
+          echo "  ✅ Processed $URL1_COUNT files"
+        fi
+        
+        # Replace URL2 with explicit character handling
+        if [ "$URL2_COUNT" -gt 0 ]; then
+          echo "🔄 Replacing URL2 (character-exact)..."
+          echo "  From: '$URL2'"
+          echo "  To:   '$NEW_URL2'"
+          
+          # Use | as delimiter to avoid issues with / characters
+          find decompiled_apk -name "*.smali" -type f -exec sed -i "s|$URL2|$NEW_URL2|g" {} \;
+          TOTAL_REPLACED=$((TOTAL_REPLACED + URL2_COUNT))
+          echo "  ✅ Processed $URL2_COUNT files"
+        fi
+        
+        echo ""
+        echo "============================================================"
+        echo "VERIFICATION WITH EXACT CHARACTER MATCHING"
+        echo "============================================================"
+        
+        # Verify URL1 replacements with exact matching
+        echo "🔍 Verifying URL1 replacements..."
+        NEW_URL1_FILES=$(find decompiled_apk -name "*.smali" -type f -exec grep -l "$NEW_URL1" {} \; 2>/dev/null || true)
+        
+        if [ -n "$NEW_URL1_FILES" ]; then
+          NEW_URL1_COUNT=$(echo "$NEW_URL1_FILES" | wc -l)
+          echo "✅ Found $NEW_URL1_COUNT files with new URL1:"
+          echo "$NEW_URL1_FILES" | head -3
+          echo ""
+          echo "Sample new content:"
+          echo "$NEW_URL1_FILES" | head -1 | while read -r file; do
+            if [ -f "$file" ]; then
+              echo "--- $file ---"
+              grep -n "$NEW_URL1" "$file" 2>/dev/null || true
+            fi
+          done
+        else
+          NEW_URL1_COUNT=0
+          echo "❌ No files found with new URL1"
+        fi
+        
+        echo ""
+        
+        # Verify URL2 replacements with exact matching
+        echo "🔍 Verifying URL2 replacements..."
+        NEW_URL2_FILES=$(find decompiled_apk -name "*.smali" -type f -exec grep -l "$NEW_URL2" {} \; 2>/dev/null || true)
+        
+        if [ -n "$NEW_URL2_FILES" ]; then
+          NEW_URL2_COUNT=$(echo "$NEW_URL2_FILES" | wc -l)
+          echo "✅ Found $NEW_URL2_COUNT files with new URL2:"
+          echo "$NEW_URL2_FILES" | head -3
+          echo ""
+          echo "Sample new content:"
+          echo "$NEW_URL2_FILES" | head -1 | while read -r file; do
+            if [ -f "$file" ]; then
+              echo "--- $file ---"
+              grep -n "$NEW_URL2" "$file" 2>/dev/null || true
+            fi
+          done
+        else
+          NEW_URL2_COUNT=0
+          echo "❌ No files found with new URL2"
+        fi
+        
+        echo ""
+        echo "============================================================"
+        echo "FINAL SUMMARY"
+        echo "============================================================"
+        
+        TOTAL_ORIGINAL=$((URL1_COUNT + URL2_COUNT))
+        TOTAL_NEW=$((NEW_URL1_COUNT + NEW_URL2_COUNT))
+        
+        echo "Original URLs found: $TOTAL_ORIGINAL"
+        echo "New URLs created: $TOTAL_NEW"
+        echo ""
+        
+        if [ "$TOTAL_NEW" -eq 8 ]; then
+          echo "🎯 PERFECT: Exactly 8 URLs replaced as expected!"
+        elif [ "$TOTAL_NEW" -gt 0 ]; then
+          echo "✅ SUCCESS: $TOTAL_NEW URLs replaced!"
+        else
+          echo "❌ ERROR: No URLs were replaced"
+          echo ""
+          echo "🔧 TROUBLESHOOTING:"
+          echo "Let's check what's actually in the files..."
+          echo ""
+          echo "Looking for any 'rebrandking' (any case):"
+          find decompiled_apk -name "*.smali" -type f -exec grep -i -H "rebrandking" {} \; 2>/dev/null | head -5 || echo "None found"
+          echo ""
+          echo "Looking for any 'dynam' (any case):"
+          find decompiled_apk -name "*.smali" -type f -exec grep -i -H "dynam" {} \; 2>/dev/null | head -5 || echo "None found"
+          echo ""
+          echo "Looking for any 'SM4trio' (any case):"
+          find decompiled_apk -name "*.smali" -type f -exec grep -i -H "SM4trio" {} \; 2>/dev/null | head -5 || echo "None found"
+          echo ""
+          echo "Checking if any smali files exist:"
+          find decompiled_apk -name "*.smali" -type f | head -5 || echo "No smali files found"
+        fi
+        
+        # Final check for any remaining old URLs
+        echo ""
+        echo "🔍 Double-checking for remaining old URLs..."
+        REMAINING_URL1=$(find decompiled_apk -name "*.smali" -type f -exec grep -c "$URL1" {} \; 2>/dev/null | awk '{sum += $1} END {print sum+0}')
+        REMAINING_URL2=$(find decompiled_apk -name "*.smali" -type f -exec grep -c "$URL2" {} \; 2>/dev/null | awk '{sum += $1} END {print sum+0}')
+        
+        if [ "$REMAINING_URL1" -eq 0 ] && [ "$REMAINING_URL2" -eq 0 ]; then
+          echo "✅ Perfect! No remaining old URLs found."
+        else
+          echo "⚠️  Found $REMAINING_URL1 instances of old URL1 and $REMAINING_URL2 instances of old URL2"
+        fi
+        
+        echo ""
+        echo "============================================================"
+        echo "CHARACTER-EXACT URL REPLACEMENT COMPLETE"
         echo "============================================================"
 
     - name: Replace package name in smali files
@@ -555,7 +595,7 @@ jobs:
         Changes Made:
         - Package Name: com.dynamic.tv → ${{ github.event.inputs.new_package_name }}
         - App Name: Dynamic TV → ${{ github.event.inputs.new_app_name }}
-        - Panel URLs: dynam → ${{ github.event.inputs.panel_url_value }} (smali format aware)
+        - Panel URLs: Character-exact URL replacement (/dynam/ → /${{ github.event.inputs.panel_url_value }}/)
         - Images: Replaced with assets from images-to-replace/ folder
         - APK: Recompiled and signed
         - Fixed: Duplicate class issues resolved
@@ -588,7 +628,7 @@ jobs:
         echo "- **Original APK:** ${{ github.event.inputs.apk_file }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Package Name:** com.dynamic.tv → ${{ github.event.inputs.new_package_name }}" >> $GITHUB_STEP_SUMMARY
         echo "- **App Name:** Dynamic TV → ${{ github.event.inputs.new_app_name }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Panel URLs:** dynam → ${{ github.event.inputs.panel_url_value }} (smali format aware)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Panel URLs:** Character-exact replacement (/dynam/ → /${{ github.event.inputs.panel_url_value }}/)" >> $GITHUB_STEP_SUMMARY
         echo "- **Images:** Replaced with provided assets" >> $GITHUB_STEP_SUMMARY
         echo "- **Fixed:** Duplicate class conflicts resolved" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
