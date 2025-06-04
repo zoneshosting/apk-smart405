@@ -326,7 +326,6 @@ jobs:
           # Create optimized configuration
           cat > apktool.yml << 'EOF'
 version: "2.9.3"
-apkFileName: ${{ github.event.inputs.apk_file }}
 isFrameworkApk: false
 usesFramework:
   ids:
@@ -437,10 +436,9 @@ EOF
         cp modified_unsigned.apk output/
         
         # Create summary
-        cat > output/modification_summary.txt << 'EOF'
+        cat > output/modification_summary.txt << 'SUMMARY_EOF'
 APK Modification Summary - Optimized Workflow
 ============================================
-Original APK: ${{ github.event.inputs.apk_file }}
 Modified APK: modified_signed_aligned.apk
 
 Optimizations Applied:
@@ -450,15 +448,21 @@ Optimizations Applied:
 - Smart recompilation with multiple fallback strategies
 
 Changes Made:
-- Package Name: com.dynamic.tv → ${{ github.event.inputs.new_package_name }}
-- App Name: Dynamic TV → ${{ github.event.inputs.new_app_name }}
-- Panel URLs: dynam → ${{ github.event.inputs.panel_url_value }}
+- Package Name: com.dynamic.tv updated
+- App Name: Dynamic TV updated
+- Panel URLs: dynam updated
 - Images: Replaced available assets
 - Conflicts: Removed problematic duplicate classes
 
-Generated: $(date)
 Workflow: Optimized APK Modifier
-EOF
+SUMMARY_EOF
+        
+        # Add dynamic content separately
+        echo "Original APK: ${{ github.event.inputs.apk_file }}" >> output/modification_summary.txt
+        echo "New Package: ${{ github.event.inputs.new_package_name }}" >> output/modification_summary.txt
+        echo "New App Name: ${{ github.event.inputs.new_app_name }}" >> output/modification_summary.txt
+        echo "Panel URL Value: ${{ github.event.inputs.panel_url_value }}" >> output/modification_summary.txt
+        echo "Generated: $(date)" >> output/modification_summary.txt
         
         echo "Files ready in output/ directory:"
         ls -la output/
