@@ -167,22 +167,104 @@ jobs:
         cd ..
         echo "✅ Manifest updated to match Dynamic TV APK compatibility"
 
-    - name: Modern APK Cleanup and URL Replacement
+    - name: 🧹 AGGRESSIVE FACEBOOK SDK CLEANUP
       run: |
-        echo "🧹 Modern cleanup and URL replacement..."
+        echo "🧹 AGGRESSIVE FACEBOOK SDK CLEANUP"
+        echo "============================================================"
         
         cd decompiled_apk
         
-        # Modern cleanup approach
-        echo "🔥 Removing problematic legacy components..."
-        find . -path "*/com/facebook/ads/internal/checkerframework" -type d -exec rm -rf {} + 2>/dev/null || true
-        find . -path "*/com/facebook/ads/internal/annotations" -type d -exec rm -rf {} + 2>/dev/null || true
-        find . -name "*.orig" -delete
-        find . -name "*.rej" -delete
+        # Step 1: Remove entire Facebook Ads SDK completely
+        echo "🔥 Removing ALL Facebook Ads SDK directories..."
+        find . -path "*/com/facebook/ads" -type d -exec rm -rf {} + 2>/dev/null || true
+        find . -path "*/com/facebook" -type d -empty -delete 2>/dev/null || true
+        
+        # Step 2: Remove problematic smali_assets folder entirely
+        echo "🔥 Removing problematic smali_assets folder..."
+        if [ -d "smali_assets" ]; then
+          echo "  Found smali_assets directory, removing entirely..."
+          rm -rf smali_assets
+          echo "  ✅ smali_assets removed"
+        fi
+        
+        # Step 3: Find and remove ALL duplicate classes across directories
+        echo "🔄 Aggressive duplicate class removal..."
+        
+        # Get all smali directories
+        SMALI_DIRS=($(find . -maxdepth 1 -name "smali*" -type d | sort))
+        echo "Found smali directories: ${SMALI_DIRS[*]}"
+        
+        # Remove duplicates - keep only in first directory found
+        if [ ${#SMALI_DIRS[@]} -gt 1 ]; then
+          PRIMARY_DIR="${SMALI_DIRS[0]}"
+          echo "Primary directory: $PRIMARY_DIR"
+          
+          # For each secondary directory, remove files that exist in primary
+          for ((i=1; i<${#SMALI_DIRS[@]}; i++)); do
+            SECONDARY_DIR="${SMALI_DIRS[i]}"
+            echo "Cleaning duplicates from: $SECONDARY_DIR"
+            
+            # Remove all files that exist in primary directory
+            find "$PRIMARY_DIR" -name "*.smali" -type f 2>/dev/null | while read -r primary_file; do
+              relative_path="${primary_file#$PRIMARY_DIR/}"
+              secondary_file="$SECONDARY_DIR/$relative_path"
+              
+              if [ -f "$secondary_file" ]; then
+                echo "    Removing duplicate: $secondary_file"
+                rm -f "$secondary_file"
+              fi
+            done
+            
+            # Clean up empty directories
+            find "$SECONDARY_DIR" -type d -empty -delete 2>/dev/null || true
+          done
+        fi
+        
+        # Step 4: Specifically target the problematic DynamicLoaderImpl class
+        echo "🎯 Targeting DynamicLoaderImpl conflicts specifically..."
+        DYNAMIC_LOADER_FILES=$(find . -name "DynamicLoaderImpl.smali" -type f 2>/dev/null || true)
+        
+        if [ -n "$DYNAMIC_LOADER_FILES" ]; then
+          echo "Found DynamicLoaderImpl files:"
+          echo "$DYNAMIC_LOADER_FILES"
+          
+          # Keep only the first one, remove the rest
+          FIRST_FILE=$(echo "$DYNAMIC_LOADER_FILES" | head -1)
+          echo "Keeping: $FIRST_FILE"
+          
+          echo "$DYNAMIC_LOADER_FILES" | tail -n +2 | while read -r file; do
+            if [ -f "$file" ]; then
+              echo "  Removing duplicate: $file"
+              rm -f "$file"
+            fi
+          done
+        fi
+        
+        # Step 5: Remove any other problematic Facebook-related files
+        echo "🧽 Final cleanup of problematic files..."
+        find . -name "*facebook*" -type f -name "*.smali" -delete 2>/dev/null || true
+        find . -name "*.orig" -delete 2>/dev/null || true
+        find . -name "*.rej" -delete 2>/dev/null || true
+        find . -name "*~" -delete 2>/dev/null || true
+        
+        # Step 6: Verify cleanup
+        echo "✅ Cleanup verification:"
+        REMAINING_FB=$(find . -path "*/com/facebook" -type d | wc -l)
+        REMAINING_ASSETS=$(find . -name "smali_assets" -type d | wc -l)
+        REMAINING_DYNAMIC=$(find . -name "DynamicLoaderImpl.smali" | wc -l)
+        
+        echo "  Remaining Facebook dirs: $REMAINING_FB"
+        echo "  Remaining smali_assets dirs: $REMAINING_ASSETS"
+        echo "  Remaining DynamicLoaderImpl files: $REMAINING_DYNAMIC"
+        
+        TOTAL_SMALI_AFTER=$(find . -name "*.smali" | wc -l)
+        echo "  Total smali files after cleanup: $TOTAL_SMALI_AFTER"
         
         cd ..
-        
-        # URL Replacement (same logic as before)
+        echo "🧹 AGGRESSIVE CLEANUP COMPLETE"
+
+    - name: 🎯 URL REPLACEMENT
+      run: |
         NEW_PANEL_VALUE="${{ github.event.inputs.panel_url_value }}"
         
         echo "🎯 URL REPLACEMENT"
