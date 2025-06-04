@@ -125,38 +125,47 @@ jobs:
         SMALI_COUNT=$(find decompiled_apk -name "*.smali" | wc -l)
         echo "📊 Smali files generated: $SMALI_COUNT"
 
-    - name: Update Android Manifest for Modern Compatibility
+    - name: Update Android Manifest for Exact Compatibility
       run: |
-        echo "📱 Updating AndroidManifest.xml for modern Android compatibility..."
+        echo "📱 Updating AndroidManifest.xml to match Dynamic TV APK compatibility..."
         
         cd decompiled_apk
         
         if [ -f "AndroidManifest.xml" ]; then
-          echo "Current manifest target SDK:"
-          grep -E "(targetSdkVersion|minSdkVersion)" AndroidManifest.xml || echo "No SDK versions found"
+          echo "Current manifest versions:"
+          grep -E "(targetSdkVersion|minSdkVersion|compileSdkVersion)" AndroidManifest.xml || echo "No SDK versions found"
           
-          # Update for modern Android compatibility (but not too high to maintain compatibility)
-          # Target SDK 30 (Android 11) for good compatibility
-          sed -i 's/android:targetSdkVersion="[0-9]*"/android:targetSdkVersion="30"/g' AndroidManifest.xml
+          # Use EXACT same SDK versions as Dynamic TV APK for perfect compatibility
+          echo "Applying Dynamic TV APK compatibility settings:"
+          echo "- compileSdkVersion: 23 (Android 6.0)"
+          echo "- minSdkVersion: 21 (Android 5.0)"
+          echo "- targetSdkVersion: 33 (Android 13)"
           
-          # Ensure minimum SDK is reasonable (API 21 = Android 5.0)
+          # Set exact SDK versions from Dynamic TV APK
+          sed -i 's/android:compileSdkVersion="[0-9]*"/android:compileSdkVersion="23"/g' AndroidManifest.xml
+          sed -i 's/android:minSdkVersion="[0-9]*"/android:minSdkVersion="21"/g' AndroidManifest.xml
+          sed -i 's/android:targetSdkVersion="[0-9]*"/android:targetSdkVersion="33"/g' AndroidManifest.xml
+          
+          # If SDK declarations don't exist, add them
           if ! grep -q "minSdkVersion" AndroidManifest.xml; then
             sed -i 's/<uses-sdk/<uses-sdk android:minSdkVersion="21"/g' AndroidManifest.xml
-          else
-            sed -i 's/android:minSdkVersion="[0-9]*"/android:minSdkVersion="21"/g' AndroidManifest.xml
           fi
           
-          # Add necessary permissions for modern Android
-          if ! grep -q "REQUEST_INSTALL_PACKAGES" AndroidManifest.xml; then
-            sed -i '/<\/manifest>/i\    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />' AndroidManifest.xml
+          if ! grep -q "targetSdkVersion" AndroidManifest.xml; then
+            sed -i 's/<uses-sdk\([^>]*\)>/<uses-sdk\1 android:targetSdkVersion="33" \/>/g' AndroidManifest.xml
           fi
           
-          echo "Updated manifest SDK versions:"
-          grep -E "(targetSdkVersion|minSdkVersion)" AndroidManifest.xml
+          # Ensure uses-sdk element exists if not present
+          if ! grep -q "uses-sdk" AndroidManifest.xml; then
+            sed -i '/<manifest/a\    <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="33" \/>' AndroidManifest.xml
+          fi
+          
+          echo "Updated manifest versions (matching Dynamic TV APK):"
+          grep -E "(targetSdkVersion|minSdkVersion|compileSdkVersion)" AndroidManifest.xml
         fi
         
         cd ..
-        echo "✅ Manifest updated for modern Android compatibility"
+        echo "✅ Manifest updated to match Dynamic TV APK compatibility"
 
     - name: Modern APK Cleanup and URL Replacement
       run: |
@@ -255,8 +264,8 @@ jobs:
         
         cd decompiled_apk
         
-        # Create modern apktool.yml
-        echo "Creating modern apktool configuration..."
+        # Create Dynamic TV compatible apktool.yml
+        echo "Creating Dynamic TV compatible apktool configuration..."
         echo 'version: "2.9.3"' > apktool.yml
         echo 'apkFileName: "${{ github.event.inputs.apk_file }}"' >> apktool.yml
         echo 'isFrameworkApk: false' >> apktool.yml
@@ -265,10 +274,12 @@ jobs:
         echo '  - 1' >> apktool.yml
         echo 'sdkInfo:' >> apktool.yml
         echo '  minSdkVersion: "21"' >> apktool.yml
-        echo '  targetSdkVersion: "30"' >> apktool.yml
-        echo '  maxSdkVersion: "34"' >> apktool.yml
+        echo '  targetSdkVersion: "33"' >> apktool.yml
+        echo '  compileSdkVersion: "23"' >> apktool.yml
         echo 'packageInfo:' >> apktool.yml
         echo 'versionInfo:' >> apktool.yml
+        echo '  versionCode: "100"' >> apktool.yml
+        echo '  versionName: "4.0"' >> apktool.yml
         echo 'compressionType: false' >> apktool.yml
         echo 'sharedLibrary: false' >> apktool.yml
         echo 'sparseResources: false' >> apktool.yml
@@ -276,7 +287,6 @@ jobs:
         echo 'doNotCompress:' >> apktool.yml
         echo '- resources.arsc' >> apktool.yml
         echo '- META-INF/MANIFEST.MF' >> apktool.yml
-        echo '- META-INF/services/javax.annotation.processing.Processor' >> apktool.yml
         
         # Clean META-INF
         if [ -d "original/META-INF" ]; then
@@ -361,12 +371,12 @@ jobs:
         echo "Original APK: ${{ github.event.inputs.apk_file }}" >> output/modification_summary.txt
         echo "Modified APK: modified_signed_aligned.apk" >> output/modification_summary.txt
         echo "" >> output/modification_summary.txt
-        echo "Modern Compatibility Updates:" >> output/modification_summary.txt
-        echo "- Target SDK: 30 (Android 11) for broad compatibility" >> output/modification_summary.txt
-        echo "- Min SDK: 21 (Android 5.0) for device support" >> output/modification_summary.txt
-        echo "- Modern signing: SHA256withRSA with 4096-bit keys" >> output/modification_summary.txt
-        echo "- Updated build tools and compilation process" >> output/modification_summary.txt
-        echo "- Enhanced manifest permissions for modern Android" >> output/modification_summary.txt
+        echo "Compatibility Updates Applied (matching Dynamic TV APK):" >> output/modification_summary.txt
+        echo "- Compile SDK: 23 (Android 6.0) - exact match" >> output/modification_summary.txt
+        echo "- Target SDK: 33 (Android 13) - exact match" >> output/modification_summary.txt
+        echo "- Min SDK: 21 (Android 5.0) - exact match" >> output/modification_summary.txt
+        echo "- Version Code: 100 - exact match" >> output/modification_summary.txt
+        echo "- Version Name: 4.0 - exact match" >> output/modification_summary.txt
         echo "" >> output/modification_summary.txt
         echo "Changes Applied:" >> output/modification_summary.txt
         echo "- Package Name: com.dynamic.tv → ${{ github.event.inputs.new_package_name }}" >> output/modification_summary.txt
