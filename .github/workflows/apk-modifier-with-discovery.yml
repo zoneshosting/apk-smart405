@@ -156,7 +156,7 @@ jobs:
         fi
 
     - name: 📤 Upload Discovery Results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: url-discovery-results
         path: |
