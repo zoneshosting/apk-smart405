@@ -324,19 +324,17 @@ jobs:
           cp apktool.yml apktool.yml.bak
           
           # Create optimized configuration
-          cat > apktool.yml << 'EOF'
-version: "2.9.3"
-isFrameworkApk: false
-usesFramework:
-  ids:
-  - 1
-sdkInfo:
-packageInfo:
-compressionType: false
-doNotCompress:
-- resources.arsc
-- META-INF/services/javax.annotation.processing.Processor
-EOF
+          echo 'version: "2.9.3"' > apktool.yml
+          echo 'isFrameworkApk: false' >> apktool.yml
+          echo 'usesFramework:' >> apktool.yml
+          echo '  ids:' >> apktool.yml
+          echo '  - 1' >> apktool.yml
+          echo 'sdkInfo:' >> apktool.yml
+          echo 'packageInfo:' >> apktool.yml
+          echo 'compressionType: false' >> apktool.yml
+          echo 'doNotCompress:' >> apktool.yml
+          echo '- resources.arsc' >> apktool.yml
+          echo '- META-INF/services/javax.annotation.processing.Processor' >> apktool.yml
         fi
         
         # Clean META-INF more thoroughly
@@ -436,28 +434,26 @@ EOF
         cp modified_unsigned.apk output/
         
         # Create summary
-        cat > output/modification_summary.txt << 'SUMMARY_EOF'
-APK Modification Summary - Optimized Workflow
-============================================
-Modified APK: modified_signed_aligned.apk
-
-Optimizations Applied:
-- Aggressive Facebook Ads SDK conflict cleanup
-- Targeted URL replacement (rebrandking URLs only)
-- Fast image processing (existing files only)
-- Smart recompilation with multiple fallback strategies
-
-Changes Made:
-- Package Name: com.dynamic.tv updated
-- App Name: Dynamic TV updated
-- Panel URLs: dynam updated
-- Images: Replaced available assets
-- Conflicts: Removed problematic duplicate classes
-
-Workflow: Optimized APK Modifier
-SUMMARY_EOF
+        echo "APK Modification Summary - Optimized Workflow" > output/modification_summary.txt
+        echo "============================================" >> output/modification_summary.txt
+        echo "Modified APK: modified_signed_aligned.apk" >> output/modification_summary.txt
+        echo "" >> output/modification_summary.txt
+        echo "Optimizations Applied:" >> output/modification_summary.txt
+        echo "- Aggressive Facebook Ads SDK conflict cleanup" >> output/modification_summary.txt
+        echo "- Targeted URL replacement (rebrandking URLs only)" >> output/modification_summary.txt
+        echo "- Fast image processing (existing files only)" >> output/modification_summary.txt
+        echo "- Smart recompilation with multiple fallback strategies" >> output/modification_summary.txt
+        echo "" >> output/modification_summary.txt
+        echo "Changes Made:" >> output/modification_summary.txt
+        echo "- Package Name: com.dynamic.tv updated" >> output/modification_summary.txt
+        echo "- App Name: Dynamic TV updated" >> output/modification_summary.txt
+        echo "- Panel URLs: dynam updated" >> output/modification_summary.txt
+        echo "- Images: Replaced available assets" >> output/modification_summary.txt
+        echo "- Conflicts: Removed problematic duplicate classes" >> output/modification_summary.txt
+        echo "" >> output/modification_summary.txt
+        echo "Workflow: Optimized APK Modifier" >> output/modification_summary.txt
         
-        # Add dynamic content separately
+        # Add dynamic content
         echo "Original APK: ${{ github.event.inputs.apk_file }}" >> output/modification_summary.txt
         echo "New Package: ${{ github.event.inputs.new_package_name }}" >> output/modification_summary.txt
         echo "New App Name: ${{ github.event.inputs.new_app_name }}" >> output/modification_summary.txt
