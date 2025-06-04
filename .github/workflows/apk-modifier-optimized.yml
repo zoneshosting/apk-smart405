@@ -324,7 +324,7 @@ jobs:
           cp apktool.yml apktool.yml.bak
           
           # Create optimized configuration
-          cat > apktool.yml << EOF
+          cat > apktool.yml << 'EOF'
 version: "2.9.3"
 apkFileName: ${{ github.event.inputs.apk_file }}
 isFrameworkApk: false
@@ -437,7 +437,7 @@ EOF
         cp modified_unsigned.apk output/
         
         # Create summary
-        cat > output/modification_summary.txt << EOF
+        cat > output/modification_summary.txt << 'EOF'
 APK Modification Summary - Optimized Workflow
 ============================================
 Original APK: ${{ github.event.inputs.apk_file }}
