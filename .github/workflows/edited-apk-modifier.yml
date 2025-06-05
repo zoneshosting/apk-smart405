@@ -372,27 +372,25 @@ jobs:
           cp decompiled_apk/apktool.yml output/apktool_preserved.yml
         fi
         
-        cat > output/modification_summary.txt << 'EOF'
-APK Modification Summary - CONNECTIVITY PRESERVED
-=================================================
-
-CONNECTIVITY PRESERVATION FEATURES:
-- NO early duplicate class cleanup performed
-- ALL networking and Firebase files preserved
-- unknownFiles section in apktool.yml kept INTACT
-- Selective duplicate class removal only
-- Character-exact URL replacement using proven method
-- Complete connectivity file verification
-
-MODIFICATIONS PERFORMED:
-- Package Name: com.dynamic.tv
-- App Name: Dynamic TV
-- Panel URLs: rebrandking replacement
-- Images: Replaced with custom assets
-- Selective duplicate class removal
-
-This APK preserves ALL networking files for internet functionality.
-EOF
+        echo "APK Modification Summary - CONNECTIVITY PRESERVED" > output/modification_summary.txt
+        echo "=================================================" >> output/modification_summary.txt
+        echo "" >> output/modification_summary.txt
+        echo "CONNECTIVITY PRESERVATION FEATURES:" >> output/modification_summary.txt
+        echo "- NO early duplicate class cleanup performed" >> output/modification_summary.txt
+        echo "- ALL networking and Firebase files preserved" >> output/modification_summary.txt
+        echo "- unknownFiles section in apktool.yml kept INTACT" >> output/modification_summary.txt
+        echo "- Selective duplicate class removal only" >> output/modification_summary.txt
+        echo "- Character-exact URL replacement using proven method" >> output/modification_summary.txt
+        echo "- Complete connectivity file verification" >> output/modification_summary.txt
+        echo "" >> output/modification_summary.txt
+        echo "MODIFICATIONS PERFORMED:" >> output/modification_summary.txt
+        echo "- Package Name: com.dynamic.tv" >> output/modification_summary.txt
+        echo "- App Name: Dynamic TV" >> output/modification_summary.txt
+        echo "- Panel URLs: rebrandking replacement" >> output/modification_summary.txt
+        echo "- Images: Replaced with custom assets" >> output/modification_summary.txt
+        echo "- Selective duplicate class removal" >> output/modification_summary.txt
+        echo "" >> output/modification_summary.txt
+        echo "This APK preserves ALL networking files for internet functionality." >> output/modification_summary.txt
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
