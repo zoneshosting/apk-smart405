@@ -617,23 +617,23 @@ jobs:
           cp decompiled_apk/apktool.yml output/apktool_preserved.yml
         fi
         
-        cat > output/modification_summary.txt << EOF
+        cat > output/modification_summary.txt << 'EOF'
 APK Modification Summary - CONNECTIVITY PRESERVED
 =================================================
 Original APK: ${{ github.event.inputs.apk_file }}
 Modified APK: modified_signed_aligned.apk
 
-🌐 CONNECTIVITY PRESERVATION FEATURES:
-✅ NO early duplicate class cleanup performed
-✅ ALL networking and Firebase files preserved during decompilation
-✅ unknownFiles section in apktool.yml kept INTACT
-✅ Selective duplicate class removal (only specific Facebook Ads duplicates)
-✅ All transport, messaging, and play-services files preserved
-✅ Character-exact URL replacement using proven method
-✅ Complete verification of connectivity file preservation
-✅ APK size and content verification performed
+CONNECTIVITY PRESERVATION FEATURES:
+- NO early duplicate class cleanup performed
+- ALL networking and Firebase files preserved during decompilation
+- unknownFiles section in apktool.yml kept INTACT
+- Selective duplicate class removal (only specific Facebook Ads duplicates)
+- All transport, messaging, and play-services files preserved
+- Character-exact URL replacement using proven method
+- Complete verification of connectivity file preservation
+- APK size and content verification performed
 
-📊 MODIFICATIONS PERFORMED:
+MODIFICATIONS PERFORMED:
 - Package Name: com.dynamic.tv → ${{ github.event.inputs.new_package_name }}
 - App Name: Dynamic TV → ${{ github.event.inputs.new_app_name }}
 - Panel URLs: Character-exact rebrandking replacement (/dynam/ → /${{ github.event.inputs.panel_url_value }}/)
@@ -641,7 +641,7 @@ Modified APK: modified_signed_aligned.apk
 - Duplicate Classes: SELECTIVE removal (connectivity-safe)
 - Configuration: Preserved with minimal compilation fixes
 
-🔧 TECHNICAL IMPROVEMENTS:
+TECHNICAL IMPROVEMENTS:
 - Used connectivity-focused decompilation (no --only-main-classes fallback)
 - Preserved all unknownFiles in apktool.yml configuration
 - Implemented selective duplicate class removal instead of aggressive cleanup
@@ -649,12 +649,12 @@ Modified APK: modified_signed_aligned.apk
 - Maintained Android framework dependencies
 - Preserved all networking libraries and configurations
 
-📁 FILES GENERATED:
+FILES GENERATED:
 - modified_signed_aligned.apk (Ready for installation with preserved connectivity)
 - modified_unsigned.apk (Unsigned version)
 - apktool_preserved.yml (Preserved configuration file for reference)
 
-⚠️ CONNECTIVITY NOTES:
+CONNECTIVITY NOTES:
 This APK has been modified with FULL connectivity preservation. All networking
 files, Firebase configurations, transport APIs, and play-services have been
 maintained to ensure internet functionality works properly.
