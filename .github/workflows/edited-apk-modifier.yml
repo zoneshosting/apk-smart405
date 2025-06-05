@@ -1,4 +1,6 @@
-name: APK Modifier - Connectivity Preserved
+{
+  `path`: `apk-modifier-connectivity-preserved.yml`,
+  `content`: `name: APK Modifier - Connectivity Preserved
 
 on:
   workflow_dispatch:
@@ -55,7 +57,7 @@ jobs:
     - name: Generate keystore
       run: |
         echo \"Generating keystore for APK signing...\"
-        keytool -genkey -v -keystore release-key.keystore -alias alias_name \\
+        keytool -genkeypair -v -keystore release-key.keystore -alias alias_name \\
           -keyalg RSA -keysize 2048 -validity 10000 \\
           -storepass password -keypass password \\
           -dname \"CN=GitHub Action, OU=CI, O=GitHub, L=GitHub, S=GitHub, C=US\"
@@ -75,7 +77,6 @@ jobs:
         echo \"CONNECTIVITY PRESERVATION: Decompiling with ALL files preserved\"
         echo \"================================================================\"
         
-        # Primary decompilation preserving ALL files
         if ! apktool d \"apk/${{ github.event.inputs.apk_file }}\" -o decompiled_apk --force; then
           echo \"Standard decompilation failed, trying with --no-debug-info...\"
           if ! apktool d \"apk/${{ github.event.inputs.apk_file }}\" -o decompiled_apk --force --no-debug-info; then
@@ -242,22 +243,17 @@ jobs:
           fi
         done
 
-    - name: Selective duplicate class removal
+    - name: Remove smali_assets com folder
       run: |
-        echo \"SELECTIVE duplicate class removal - connectivity safe\"
-        echo \"=====================================================\"
+        echo \"CRITICAL: Removing smali_assets/com folder to prevent duplicate class errors\"
+        echo \"===========================================================================\"
         
         cd decompiled_apk
         
-        # CRITICAL: Remove entire smali_assets/com folder to prevent all duplicate class errors
-        echo \"Checking for smali_assets/com folder...\"
         if [ -d \"smali_assets/com\" ]; then
-          echo \"Found smali_assets/com directory - removing entire folder to prevent duplicate class errors\"
-          echo \"Contents before removal:\"
-          find smali_assets/com -type f | wc -l
+          echo \"Found smali_assets/com directory - removing entire folder\"
           echo \"Total files in smali_assets/com: $(find smali_assets/com -type f | wc -l)\"
           
-          # Remove the entire com folder from smali_assets
           rm -rf smali_assets/com
           
           if [ ! -d \"smali_assets/com\" ]; then
@@ -270,13 +266,20 @@ jobs:
           echo \"No smali_assets/com folder found - nothing to remove\"
         fi
         
-        # Check what remains in smali_assets
         if [ -d \"smali_assets\" ]; then
           echo \"Remaining smali_assets structure:\"
-          find smali_assets -maxdepth 2 -type d | sort
+          find smali_assets -maxdepth 2 -type d | sort || echo \"smali_assets is empty\"
         fi
         
-        # Also clean up individual duplicates in smali_classes directories (if any remain)
+        cd ..
+
+    - name: Clean up duplicate classes
+      run: |
+        echo \"Cleaning up any remaining duplicate classes\"
+        echo \"===========================================\"
+        
+        cd decompiled_apk
+        
         DUPLICATE_CLASSES=(
           \"com/facebook/ads/internal/dynamicloading/DynamicLoader\"
           \"com/facebook/ads/internal/api/AdNativeComponentView\"
@@ -284,13 +287,11 @@ jobs:
           \"com/facebook/ads/internal/checkerframework/framework/qual/MonotonicQualifier\"
         )
         
-        echo \"Checking for remaining duplicate classes in smali_classes directories...\"
         for class_pattern in \"${DUPLICATE_CLASSES[@]}\"; do
           duplicate_files=$(find . -path \"*/smali_classes*/$class_pattern.smali\" 2>/dev/null || echo \"\")
           if [ -n \"$duplicate_files\" ]; then
             echo \"Found duplicates of $class_pattern:\"
             echo \"$duplicate_files\"
-            # Keep the first one, remove the rest
             echo \"$duplicate_files\" | tail -n +2 | while read -r duplicate_file; do
               if [ -f \"$duplicate_file\" ]; then
                 echo \"  Removing duplicate: $duplicate_file\"
@@ -300,16 +301,10 @@ jobs:
           fi
         done
         
-        # Clean up any remaining artifacts
         find . -name \"*.orig\" -delete 2>/dev/null || true
         find . -type d -empty -delete 2>/dev/null || true
         
         cd ..
-        
-        echo \"\"
-        echo \"CRITICAL: Entire smali_assets/com folder removed to prevent all duplicate class errors\"
-        echo \"This should eliminate MonotonicQualifier and all other Facebook duplicate class issues\"
-        echo \"Connectivity files in other directories remain preserved\"
 
     - name: Preserve APK configuration
       run: |
@@ -412,25 +407,13 @@ jobs:
           cp decompiled_apk/apktool.yml output/apktool_preserved.yml
         fi
         
-        echo \"APK Modification Summary - CONNECTIVITY PRESERVED\" > output/modification_summary.txt
-        echo \"=================================================\" >> output/modification_summary.txt
-        echo \"\" >> output/modification_summary.txt
-        echo \"CONNECTIVITY PRESERVATION FEATURES:\" >> output/modification_summary.txt
-        echo \"- NO early duplicate class cleanup performed\" >> output/modification_summary.txt
-        echo \"- ALL networking and Firebase files preserved\" >> output/modification_summary.txt
-        echo \"- unknownFiles section in apktool.yml kept INTACT\" >> output/modification_summary.txt
-        echo \"- Selective duplicate class removal only\" >> output/modification_summary.txt
-        echo \"- Character-exact URL replacement using proven method\" >> output/modification_summary.txt
-        echo \"- Complete connectivity file verification\" >> output/modification_summary.txt
-        echo \"\" >> output/modification_summary.txt
-        echo \"MODIFICATIONS PERFORMED:\" >> output/modification_summary.txt
-        echo \"- Package Name: com.dynamic.tv\" >> output/modification_summary.txt
-        echo \"- App Name: Dynamic TV\" >> output/modification_summary.txt
-        echo \"- Panel URLs: rebrandking replacement\" >> output/modification_summary.txt
-        echo \"- Images: Replaced with custom assets\" >> output/modification_summary.txt
-        echo \"- Selective duplicate class removal\" >> output/modification_summary.txt
-        echo \"\" >> output/modification_summary.txt
-        echo \"This APK preserves ALL networking files for internet functionality.\" >> output/modification_summary.txt
+        echo \"APK Modification Summary - CONNECTIVITY PRESERVED\" > output/summary.txt
+        echo \"=================================================\" >> output/summary.txt
+        echo \"Package Name: com.dynamic.tv -> ${{ github.event.inputs.new_package_name }}\" >> output/summary.txt
+        echo \"App Name: Dynamic TV -> ${{ github.event.inputs.new_app_name }}\" >> output/summary.txt
+        echo \"Panel URLs: dynam -> ${{ github.event.inputs.panel_url_value }}\" >> output/summary.txt
+        echo \"Connectivity: ALL networking files preserved\" >> output/summary.txt
+        echo \"Duplicate Classes: smali_assets/com folder removed\" >> output/summary.txt
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
@@ -446,9 +429,11 @@ jobs:
         echo \"### Key Features:\" >> $GITHUB_STEP_SUMMARY
         echo \"- Full connectivity file preservation\" >> $GITHUB_STEP_SUMMARY
         echo \"- Character-exact URL replacement\" >> $GITHUB_STEP_SUMMARY
-        echo \"- Selective duplicate class removal\" >> $GITHUB_STEP_SUMMARY
+        echo \"- Complete smali_assets/com folder removal\" >> $GITHUB_STEP_SUMMARY
         echo \"- Configuration protection\" >> $GITHUB_STEP_SUMMARY
         echo \"\" >> $GITHUB_STEP_SUMMARY
         echo \"### Output:\" >> $GITHUB_STEP_SUMMARY
         echo \"- Modified APK: modified_signed_aligned.apk\" >> $GITHUB_STEP_SUMMARY
         echo \"- Ready for installation with preserved connectivity\" >> $GITHUB_STEP_SUMMARY
+`
+}
