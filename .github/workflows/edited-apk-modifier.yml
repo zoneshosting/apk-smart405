@@ -452,5 +452,3 @@ jobs:
         echo \"### Output:\" >> $GITHUB_STEP_SUMMARY
         echo \"- Modified APK: modified_signed_aligned.apk\" >> $GITHUB_STEP_SUMMARY
         echo \"- Ready for installation with preserved connectivity\" >> $GITHUB_STEP_SUMMARY
-`
-
