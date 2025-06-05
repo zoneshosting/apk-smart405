@@ -76,7 +76,7 @@ jobs:
 
     - name: Decompile APK with CONNECTIVITY PRESERVATION
       run: |
-        echo "🌐 CONNECTIVITY PRESERVATION: Decompiling with ALL networking files preserved"
+        echo "CONNECTIVITY PRESERVATION: Decompiling with ALL networking files preserved"
         echo "============================================================"
         echo "Decompiling apk/${{ github.event.inputs.apk_file }} with FULL connectivity preservation..."
         
@@ -94,27 +94,27 @@ jobs:
           exit 1
         fi
         
-        echo "✅ APK decompiled successfully with ALL connectivity files preserved"
-        echo "📊 Decompiled APK structure:"
+        echo "APK decompiled successfully with ALL connectivity files preserved"
+        echo "Decompiled APK structure:"
         find decompiled_apk -maxdepth 2 -type d | sort
         
         # Verify smali files were generated
         SMALI_COUNT=$(find decompiled_apk -name "*.smali" | wc -l)
-        echo "📊 Total smali files generated: $SMALI_COUNT"
+        echo "Total smali files generated: $SMALI_COUNT"
         
         if [ "$SMALI_COUNT" -eq 0 ]; then
-          echo "⚠️ WARNING: No smali files generated - URL replacement may not work"
+          echo "WARNING: No smali files generated - URL replacement may not work"
         else
-          echo "✅ Smali files generated successfully - CONNECTIVITY PRESERVED"
+          echo "Smali files generated successfully - CONNECTIVITY PRESERVED"
         fi
         
         echo ""
-        echo "🌐 CRITICAL: NO connectivity files will be removed!"
-        echo "🌐 ALL networking, Firebase, and transport files preserved!"
+        echo "CRITICAL: NO connectivity files will be removed!"
+        echo "ALL networking, Firebase, and transport files preserved!"
 
     - name: Verify Critical Connectivity Files
       run: |
-        echo "🔍 CONNECTIVITY VERIFICATION: Checking for essential network files"
+        echo "CONNECTIVITY VERIFICATION: Checking for essential network files"
         echo "============================================================"
         
         cd decompiled_apk
@@ -124,7 +124,7 @@ jobs:
         TRANSPORT_COUNT=$(find . -name "*transport*" -o -name "*network*" | wc -l)
         PLAYSERVICES_COUNT=$(find . -name "*play-services*" | wc -l)
         
-        echo "📊 Critical connectivity files found:"
+        echo "Critical connectivity files found:"
         echo "  Firebase/Messaging files: $FIREBASE_COUNT"
         echo "  Transport/Network files: $TRANSPORT_COUNT"
         echo "  Play Services files: $PLAYSERVICES_COUNT"
@@ -135,20 +135,20 @@ jobs:
           echo "  Properties files in apktool.yml: $UNKNOWN_FILES_COUNT"
           
           echo ""
-          echo "🔍 Sample connectivity files in apktool.yml:"
+          echo "Sample connectivity files in apktool.yml:"
           grep -E "(firebase|transport|messaging|play-services)" apktool.yml | head -5 || echo "None found in grep"
         fi
         
         cd ..
         
         echo ""
-        echo "✅ Connectivity verification complete - files preserved"
+        echo "Connectivity verification complete - files preserved"
 
     - name: Character-Exact URL Replacement - PROVEN METHOD
       run: |
         NEW_PANEL_VALUE="${{ github.event.inputs.panel_url_value }}"
         
-        echo "🎯 CHARACTER-EXACT URL REPLACEMENT - PROVEN METHOD"
+        echo "CHARACTER-EXACT URL REPLACEMENT - PROVEN METHOD"
         echo "============================================================"
         echo "Using the exact method that worked in successful runs"
         echo "Target: dynam → $NEW_PANEL_VALUE"
@@ -163,17 +163,17 @@ jobs:
         echo ""
         
         # PROVEN METHOD: Direct find and replace in all smali files
-        echo "🔍 Searching and replacing URLs in all smali files..."
+        echo "Searching and replacing URLs in all smali files..."
         
         # Method that worked: find all smali files and replace directly
         find decompiled_apk -name "*.smali" -type f -exec grep -l "$OLD_URL_PATTERN" {} \; > url_files.txt
         
         if [ -s url_files.txt ]; then
-          echo "📋 Found files containing rebrandking URLs:"
+          echo "Found files containing rebrandking URLs:"
           cat url_files.txt
           echo ""
           
-          echo "🔄 Performing URL replacements..."
+          echo "Performing URL replacements..."
           
           # Replace using the proven sed method with pipe delimiter
           while IFS= read -r file; do
@@ -190,12 +190,12 @@ jobs:
             echo "  After:"
             grep -n "$NEW_URL_PATTERN" "$file" | head -2 | sed 's/^/    /'
             
-            echo "  ✅ Processed"
+            echo "  Processed"
             echo ""
             
           done < url_files.txt
           
-          echo "🔍 Final verification..."
+          echo "Final verification..."
           
           # Check results
           OLD_REMAINING=$(find decompiled_apk -name "*.smali" -type f -exec grep -l "$OLD_URL_PATTERN" {} \; | wc -l)
@@ -206,23 +206,23 @@ jobs:
           
           if [ "$OLD_REMAINING" -eq 0 ] && [ "$NEW_FOUND" -gt 0 ]; then
             echo ""
-            echo "🎉 SUCCESS! URL replacement completed successfully!"
-            echo "✅ All rebrandking URLs have been updated to use: $NEW_PANEL_VALUE"
+            echo "SUCCESS! URL replacement completed successfully!"
+            echo "All rebrandking URLs have been updated to use: $NEW_PANEL_VALUE"
           elif [ "$NEW_FOUND" -gt 0 ]; then
             echo ""
-            echo "✅ PARTIAL SUCCESS: Found $NEW_FOUND files with new URLs"
+            echo "PARTIAL SUCCESS: Found $NEW_FOUND files with new URLs"
             if [ "$OLD_REMAINING" -gt 0 ]; then
-              echo "⚠️ Note: $OLD_REMAINING files still contain old URLs"
+              echo "Note: $OLD_REMAINING files still contain old URLs"
             fi
           else
             echo ""
-            echo "❌ ERROR: URL replacement may have failed"
+            echo "ERROR: URL replacement may have failed"
             echo "No files found with new URL pattern"
           fi
           
         else
-          echo "❌ No files found containing rebrandking URLs"
-          echo "🔍 Searching for any rebrandking references..."
+          echo "No files found containing rebrandking URLs"
+          echo "Searching for any rebrandking references..."
           find decompiled_apk -name "*.smali" -type f -exec grep -l "rebrandking" {} \; | head -5
         fi
         
@@ -230,7 +230,7 @@ jobs:
         rm -f url_files.txt
         
         echo ""
-        echo "🎯 URL REPLACEMENT COMPLETE - CONNECTIVITY PRESERVED"
+        echo "URL REPLACEMENT COMPLETE - CONNECTIVITY PRESERVED"
         echo "============================================================"
 
     - name: Replace package name in smali files
@@ -373,7 +373,7 @@ jobs:
 
     - name: SELECTIVE Duplicate Class Removal - CONNECTIVITY SAFE
       run: |
-        echo "🔧 SELECTIVE DUPLICATE CLASS REMOVAL - CONNECTIVITY PRESERVED"
+        echo "SELECTIVE DUPLICATE CLASS REMOVAL - CONNECTIVITY PRESERVED"
         echo "============================================================"
         echo "Removing ONLY specific duplicate classes while preserving ALL connectivity files"
         
@@ -382,7 +382,7 @@ jobs:
         # SELECTIVE removal - only remove specific known duplicate classes
         # DO NOT remove entire directories that might contain connectivity files
         
-        echo "🔍 Checking for specific Facebook Ads SDK duplicates..."
+        echo "Checking for specific Facebook Ads SDK duplicates..."
         
         # Only remove specific duplicate Facebook Ads classes, not entire directories
         DUPLICATE_CLASSES=(
@@ -427,20 +427,20 @@ jobs:
         cd ..
         
         echo ""
-        echo "✅ SELECTIVE duplicate class removal completed!"
-        echo "🌐 ALL connectivity and networking files preserved!"
-        echo "🔧 Only specific duplicate classes removed for compilation compatibility"
+        echo "SELECTIVE duplicate class removal completed!"
+        echo "ALL connectivity and networking files preserved!"
+        echo "Only specific duplicate classes removed for compilation compatibility"
 
     - name: Preserve APK Configuration - CONNECTIVITY FOCUSED
       run: |
-        echo "🛠️ PRESERVING APK CONFIGURATION - CONNECTIVITY FOCUSED"
+        echo "PRESERVING APK CONFIGURATION - CONNECTIVITY FOCUSED"
         echo "============================================================"
         echo "Preserving essential configuration while fixing compilation issues"
         
         cd decompiled_apk
         
         if [ -f "apktool.yml" ]; then
-          echo "📋 Original apktool.yml configuration:"
+          echo "Original apktool.yml configuration:"
           echo "Checking for unknownFiles (connectivity files)..."
           
           # Create backup
@@ -448,8 +448,8 @@ jobs:
           
           # PRESERVE unknownFiles section - DO NOT comment it out!
           # Only make minimal changes for compilation
-          echo "🌐 PRESERVING unknownFiles section with all connectivity files"
-          echo "🔧 Making minimal compilation fixes only"
+          echo "PRESERVING unknownFiles section with all connectivity files"
+          echo "Making minimal compilation fixes only"
           
           # Only comment out problematic compression settings if they exist
           # DO NOT touch unknownFiles section!
@@ -467,18 +467,18 @@ jobs:
             echo "- '*.gif'" >> apktool.yml
           fi
           
-          echo "✅ Configuration preserved with connectivity files intact"
+          echo "Configuration preserved with connectivity files intact"
           
           # Verify unknownFiles section is still present
           if grep -q "unknownFiles:" apktool.yml; then
-            echo "✅ unknownFiles section preserved - connectivity files protected"
+            echo "unknownFiles section preserved - connectivity files protected"
           else
-            echo "⚠️ WARNING: unknownFiles section missing - restoring from backup"
+            echo "WARNING: unknownFiles section missing - restoring from backup"
             cp apktool.yml.backup apktool.yml
           fi
           
         else
-          echo "⚠️ No apktool.yml found"
+          echo "No apktool.yml found"
         fi
         
         # Clean META-INF but preserve essential files
@@ -491,11 +491,11 @@ jobs:
         fi
         
         cd ..
-        echo "🌐 APK configuration preserved with connectivity intact"
+        echo "APK configuration preserved with connectivity intact"
 
     - name: Recompile APK with Connectivity Preservation
       run: |
-        echo "🔨 RECOMPILING APK WITH CONNECTIVITY PRESERVATION"
+        echo "RECOMPILING APK WITH CONNECTIVITY PRESERVATION"
         echo "============================================================"
         echo "Recompiling with all networking and connectivity files intact..."
         
@@ -523,12 +523,12 @@ jobs:
           exit 1
         fi
         
-        echo "✅ APK compiled successfully with connectivity preserved"
+        echo "APK compiled successfully with connectivity preserved"
         ls -lh modified_unsigned.apk
 
     - name: Sign APK
       run: |
-        echo "✍️ SIGNING APK..."
+        echo "SIGNING APK..."
         
         jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 \
           -keystore release-key.keystore -storepass password \
@@ -546,43 +546,43 @@ jobs:
           exit 1
         fi
         
-        echo "✅ APK signed and aligned successfully"
+        echo "APK signed and aligned successfully"
         ls -lh modified_signed_aligned.apk
 
     - name: Verify APK and Connectivity
       run: |
-        echo "🔍 VERIFYING APK AND CONNECTIVITY PRESERVATION"
+        echo "VERIFYING APK AND CONNECTIVITY PRESERVATION"
         echo "============================================================"
         
-        echo "📋 APK Signature Verification:"
+        echo "APK Signature Verification:"
         jarsigner -verify -verbose -certs modified_signed_aligned.apk
         
         if [ $? -eq 0 ]; then
-          echo "✅ APK signature verification successful"
+          echo "APK signature verification successful"
         else
-          echo "⚠️ APK signature verification failed, but APK may still be usable"
+          echo "APK signature verification failed, but APK may still be usable"
         fi
         
         echo ""
-        echo "📋 APK Information:"
+        echo "APK Information:"
         aapt dump badging modified_signed_aligned.apk | head -10 || echo "Could not get APK info with aapt"
         
         echo ""
-        echo "🌐 Connectivity Preservation Verification:"
+        echo "Connectivity Preservation Verification:"
         
         # Check if the APK contains essential connectivity files
         echo "Checking for Firebase/networking files in compiled APK..."
         unzip -l modified_signed_aligned.apk | grep -E "(firebase|transport|messaging|play-services)" | wc -l > connectivity_files_count.txt
         CONNECTIVITY_COUNT=$(cat connectivity_files_count.txt)
         
-        echo "📊 Connectivity-related files in final APK: $CONNECTIVITY_COUNT"
+        echo "Connectivity-related files in final APK: $CONNECTIVITY_COUNT"
         
         if [ "$CONNECTIVITY_COUNT" -gt 0 ]; then
-          echo "✅ Connectivity files present in final APK"
-          echo "📋 Sample connectivity files:"
+          echo "Connectivity files present in final APK"
+          echo "Sample connectivity files:"
           unzip -l modified_signed_aligned.apk | grep -E "(firebase|transport|messaging|play-services)" | head -5
         else
-          echo "⚠️ WARNING: Few connectivity files detected in final APK"
+          echo "WARNING: Few connectivity files detected in final APK"
           echo "This might indicate connectivity preservation issues"
         fi
         
@@ -591,23 +591,23 @@ jobs:
         MODIFIED_SIZE=$(stat -c%s "modified_signed_aligned.apk")
         SIZE_RATIO=$(( MODIFIED_SIZE * 100 / ORIGINAL_SIZE ))
         
-        echo "📊 APK Size Comparison:"
+        echo "APK Size Comparison:"
         echo "  Original: $ORIGINAL_SIZE bytes"
         echo "  Modified: $MODIFIED_SIZE bytes"
         echo "  Ratio: $SIZE_RATIO%"
         
         if [ "$SIZE_RATIO" -lt 80 ]; then
-          echo "⚠️ WARNING: Significant size reduction detected ($SIZE_RATIO%)"
+          echo "WARNING: Significant size reduction detected ($SIZE_RATIO%)"
           echo "This might indicate important files were removed"
         else
-          echo "✅ APK size ratio acceptable ($SIZE_RATIO%) - files likely preserved"
+          echo "APK size ratio acceptable ($SIZE_RATIO%) - files likely preserved"
         fi
         
         rm -f connectivity_files_count.txt
 
     - name: Create output directory and organize files
       run: |
-        echo "📁 ORGANIZING OUTPUT FILES..."
+        echo "ORGANIZING OUTPUT FILES..."
         mkdir -p output
         cp modified_signed_aligned.apk output/
         cp modified_unsigned.apk output/
@@ -617,8 +617,8 @@ jobs:
           cp decompiled_apk/apktool.yml output/apktool_preserved.yml
         fi
         
-        # Create modification summary
-        cat > output/modification_summary.txt << 'SUMMARY_EOF'
+        # Create modification summary file
+        cat << 'SUMMARY_EOF' > output/modification_summary.txt
 APK Modification Summary - CONNECTIVITY PRESERVED
 =================================================
 Original APK: ${{ github.event.inputs.apk_file }}
@@ -667,7 +667,7 @@ Commit: ${{ github.sha }}
 Workflow Run: ${{ github.run_number }}
 SUMMARY_EOF
         
-        echo "📁 Files organized in output/ directory:"
+        echo "Files organized in output/ directory:"
         ls -la output/
 
     - name: Upload modified APK
@@ -679,33 +679,33 @@ SUMMARY_EOF
 
     - name: Show connectivity preservation summary
       run: |
-        echo "## 🌐 APK Modification Complete - Connectivity Preserved!" >> $GITHUB_STEP_SUMMARY
+        echo "## APK Modification Complete - Connectivity Preserved!" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 🔧 Key Connectivity Fixes Applied:" >> $GITHUB_STEP_SUMMARY
-        echo "- **🌐 Full File Preservation:** NO aggressive file removal - all networking files kept" >> $GITHUB_STEP_SUMMARY
-        echo "- **📝 Configuration Protection:** unknownFiles section in apktool.yml preserved intact" >> $GITHUB_STEP_SUMMARY
-        echo "- **🎯 Selective Cleanup:** Only specific duplicate classes removed, not entire directories" >> $GITHUB_STEP_SUMMARY
-        echo "- **🔍 Connectivity Verification:** Comprehensive checks for networking file preservation" >> $GITHUB_STEP_SUMMARY
-        echo "- **⚡ Proven URL Method:** Character-exact replacement using successful approach" >> $GITHUB_STEP_SUMMARY
-        echo "- **🛡️ Framework Protection:** Android framework dependencies maintained" >> $GITHUB_STEP_SUMMARY
+        echo "### Key Connectivity Fixes Applied:" >> $GITHUB_STEP_SUMMARY
+        echo "- **Full File Preservation:** NO aggressive file removal - all networking files kept" >> $GITHUB_STEP_SUMMARY
+        echo "- **Configuration Protection:** unknownFiles section in apktool.yml preserved intact" >> $GITHUB_STEP_SUMMARY
+        echo "- **Selective Cleanup:** Only specific duplicate classes removed, not entire directories" >> $GITHUB_STEP_SUMMARY
+        echo "- **Connectivity Verification:** Comprehensive checks for networking file preservation" >> $GITHUB_STEP_SUMMARY
+        echo "- **Proven URL Method:** Character-exact replacement using successful approach" >> $GITHUB_STEP_SUMMARY
+        echo "- **Framework Protection:** Android framework dependencies maintained" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 📊 Modifications Applied:" >> $GITHUB_STEP_SUMMARY
+        echo "### Modifications Applied:" >> $GITHUB_STEP_SUMMARY
         echo "- **Original APK:** ${{ github.event.inputs.apk_file }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Package Name:** com.dynamic.tv → ${{ github.event.inputs.new_package_name }}" >> $GITHUB_STEP_SUMMARY
         echo "- **App Name:** Dynamic TV → ${{ github.event.inputs.new_app_name }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Panel URLs:** Proven rebrandking replacement (/dynam/ → /${{ github.event.inputs.panel_url_value }}/)" >> $GITHUB_STEP_SUMMARY
         echo "- **Images:** Replaced with provided custom branding assets" >> $GITHUB_STEP_SUMMARY
-        echo "- **Connectivity:** 🌐 ALL networking files preserved for internet functionality" >> $GITHUB_STEP_SUMMARY
+        echo "- **Connectivity:** ALL networking files preserved for internet functionality" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 📁 Output Files:" >> $GITHUB_STEP_SUMMARY
+        echo "### Output Files:" >> $GITHUB_STEP_SUMMARY
         echo "- **Production APK:** modified_signed_aligned.apk" >> $GITHUB_STEP_SUMMARY
         echo "- **Development APK:** modified_unsigned.apk" >> $GITHUB_STEP_SUMMARY
         echo "- **Configuration:** apktool_preserved.yml (for reference)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 📥 Download:" >> $GITHUB_STEP_SUMMARY
+        echo "### Download:" >> $GITHUB_STEP_SUMMARY
         echo "The modified APK has been uploaded as workflow artifact **modified-apk-connectivity-preserved-${{ github.run_number }}**" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 🚀 Installation:" >> $GITHUB_STEP_SUMMARY
+        echo "### Installation:" >> $GITHUB_STEP_SUMMARY
         echo "**Ready for installation with internet connectivity preserved and 'Add Playlist' function working!**" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "---" >> $GITHUB_STEP_SUMMARY
