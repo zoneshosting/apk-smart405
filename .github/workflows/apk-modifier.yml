@@ -111,7 +111,7 @@ jobs:
         echo "🚨 IMPORTANT: NO duplicate class cleanup at this stage!"
         echo "🚨 ALL files preserved to maintain app functionality!"
 
-    - name: 🎯 PROVEN URL REPLACEMENT METHOD
+    - name: PROVEN URL REPLACEMENT METHOD
       run: |
         NEW_PANEL_VALUE="${{ github.event.inputs.panel_url_value }}"
         
@@ -338,56 +338,56 @@ jobs:
         
         echo "Package directory structure update completed"
 
-    - name: 🧹 CRITICAL: Remove smali_assets/com before recompilation
+    - name: CRITICAL Remove smali_assets com before recompilation
       run: |
-        echo "🧹 CRITICAL: Removing smali_assets/com folder to prevent duplicate class errors"
+        echo "CRITICAL: Removing smali_assets/com folder to prevent duplicate class errors"
         echo "============================================================"
-        echo "🚨 This step prevents the Facebook Ads SDK duplicate class compilation error"
+        echo "This step prevents the Facebook Ads SDK duplicate class compilation error"
         
         cd decompiled_apk
         
         # Check if smali_assets/com exists
         if [ -d "smali_assets/com" ]; then
-          echo "📁 Found smali_assets/com directory"
-          echo "📊 Contents before removal:"
+          echo "Found smali_assets/com directory"
+          echo "Contents before removal:"
           find smali_assets/com -type f | head -10
           echo ""
           
           # Remove the entire com folder from smali_assets
-          echo "🗑️ Removing smali_assets/com directory..."
+          echo "Removing smali_assets/com directory..."
           rm -rf smali_assets/com
           
           if [ ! -d "smali_assets/com" ]; then
-            echo "✅ Successfully removed smali_assets/com directory"
+            echo "Successfully removed smali_assets/com directory"
           else
-            echo "❌ Failed to remove smali_assets/com directory"
+            echo "Failed to remove smali_assets/com directory"
             exit 1
           fi
         else
-          echo "ℹ️ No smali_assets/com directory found - nothing to remove"
+          echo "No smali_assets/com directory found - nothing to remove"
         fi
         
         # Check what's left in smali_assets
         if [ -d "smali_assets" ]; then
-          echo "📊 Remaining smali_assets structure:"
+          echo "Remaining smali_assets structure:"
           find smali_assets -maxdepth 2 -type d | sort
         fi
         
         # Remove any .orig files that might have been created during editing
         orig_count=$(find . -name "*.orig" | wc -l)
         if [ "$orig_count" -gt 0 ]; then
-          echo "🗑️ Removing $orig_count .orig files..."
+          echo "Removing $orig_count .orig files..."
           find . -name "*.orig" -delete
         fi
         
         # Remove empty directories
-        echo "🗑️ Removing empty directories..."
+        echo "Removing empty directories..."
         find . -type d -empty -delete 2>/dev/null || true
         
         cd ..
         
-        echo "✅ Pre-compilation cleanup completed!"
-        echo "🚨 This should prevent the MonotonicQualifier duplicate class error"
+        echo "Pre-compilation cleanup completed!"
+        echo "This should prevent the MonotonicQualifier duplicate class error"
 
     - name: Fix APK compilation issues
       run: |
@@ -440,7 +440,7 @@ jobs:
           exit 1
         fi
         
-        echo "✅ APK compiled successfully with duplicate class issue resolved"
+        echo "APK compiled successfully with duplicate class issue resolved"
         ls -lh modified_unsigned.apk
 
     - name: Sign APK
@@ -493,7 +493,7 @@ jobs:
         Original APK: ${{ github.event.inputs.apk_file }}
         Modified APK: modified_signed_aligned.apk
 
-        🚨 CONNECTIVITY PRESERVATION + COMPILATION FIX:
+        CONNECTIVITY PRESERVATION + COMPILATION FIX:
         - NO early duplicate class cleanup performed
         - ALL files preserved during decompilation and modification
         - Used proven URL replacement method from successful runs
@@ -531,9 +531,9 @@ jobs:
 
     - name: Show summary
       run: |
-        echo "## 🎉 APK Modification Complete - Fixed Compilation!" >> $GITHUB_STEP_SUMMARY
+        echo "## APK Modification Complete - Fixed Compilation!" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 🔧 Key Fixes:" >> $GITHUB_STEP_SUMMARY
+        echo "### Key Fixes:" >> $GITHUB_STEP_SUMMARY
         echo "- **Proven URL Method:** Using exact approach from successful APK Modifier runs" >> $GITHUB_STEP_SUMMARY
         echo "- **Compilation Fix:** Removed smali_assets/com folder to prevent duplicate class errors" >> $GITHUB_STEP_SUMMARY
         echo "- **ALL Files Preserved:** No early cleanup to maintain connectivity" >> $GITHUB_STEP_SUMMARY
@@ -543,10 +543,10 @@ jobs:
         echo "- **Original APK:** ${{ github.event.inputs.apk_file }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Package Name:** com.dynamic.tv → ${{ github.event.inputs.new_package_name }}" >> $GITHUB_STEP_SUMMARY
         echo "- **App Name:** Dynamic TV → ${{ github.event.inputs.new_app_name }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Panel URLs:** 🎯 Proven rebrandking replacement (/dynam/ → /${{ github.event.inputs.panel_url_value }}/)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Panel URLs:** Proven rebrandking replacement (/dynam/ → /${{ github.event.inputs.panel_url_value }}/)" >> $GITHUB_STEP_SUMMARY
         echo "- **Images:** Replaced with provided assets" >> $GITHUB_STEP_SUMMARY
-        echo "- **Connectivity:** ✅ ALL network files preserved" >> $GITHUB_STEP_SUMMARY
-        echo "- **Compilation:** ✅ Duplicate class errors resolved" >> $GITHUB_STEP_SUMMARY
+        echo "- **Connectivity:** ALL network files preserved" >> $GITHUB_STEP_SUMMARY
+        echo "- **Compilation:** Duplicate class errors resolved" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Output Files:" >> $GITHUB_STEP_SUMMARY
         echo "- **Signed APK:** modified_signed_aligned.apk" >> $GITHUB_STEP_SUMMARY
@@ -555,4 +555,4 @@ jobs:
         echo "### Download:" >> $GITHUB_STEP_SUMMARY
         echo "The modified APK has been uploaded as workflow artifact **modified-apk-fixed-compilation-${{ github.run_number }}**" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "✅ **Ready for installation with internet connectivity preserved and compilation errors fixed!**" >> $GITHUB_STEP_SUMMARY
+        echo "**Ready for installation with internet connectivity preserved and compilation errors fixed!**" >> $GITHUB_STEP_SUMMARY
