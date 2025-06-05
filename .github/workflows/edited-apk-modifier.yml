@@ -1,6 +1,4 @@
-{
-  `path`: `apk-modifier-connectivity-preserved.yml`,
-  `content`: `name: APK Modifier - Connectivity Preserved
+name: APK Modifier - Connectivity Preserved
 
 on:
   workflow_dispatch:
@@ -455,4 +453,4 @@ jobs:
         echo \"- Modified APK: modified_signed_aligned.apk\" >> $GITHUB_STEP_SUMMARY
         echo \"- Ready for installation with preserved connectivity\" >> $GITHUB_STEP_SUMMARY
 `
-}
+
